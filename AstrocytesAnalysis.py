@@ -3,25 +3,38 @@ import numpy.ma as ma
 from cellpose import plot, utils
 from matplotlib import pyplot as plt, patches
 
-def clamp(num, min_value, max_value):
-   return max(min(num, max_value), min_value)
+def create_circular_mask(h, w, center=None, radius=None):
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
 
-dat = np.load('', allow_pickle=True).item()
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return mask
+
+dat = np.load('/home/bob/Downloads/TrainingSet/32_0_seg.npy', allow_pickle=True).item()
 
 # plot image with masks overlaid
-mask_RGB = plot.mask_overlay(dat['img'], dat['masks'],
-                        colors=np.array(dat['colors']))
+# mask_RGB = plot.mask_overlay(dat['img'], dat['masks'],
+#                         colors=np.array(dat['colors']))
 
 # plot image with outlines overlaid in red
 outlines = utils.outlines_list(dat['masks'])
 
-samplingImage = plt.imread('')
-plt.imshow(samplingImage)
+#print(dat['masks'][0][0])
 
-#fig = plt.figure()
+samplingImage = plt.imread('/home/bob/Downloads/TrainingSet/32_0.tiff')
 
-#fig, axs = plt.subplots(len(outlines))
-
+masks = []
+wholeMask = dat['masks']
+wholeMask = wholeMask > 0
+# print(wholeMask.shape)
+# print(np.max(wholeMask))
+# print(wholeMask[1234,243])
+i = 0
 for o in outlines:
     #get average x and y
     centerX = 0
@@ -47,11 +60,19 @@ for o in outlines:
     stdY = np.std(o[:,1])
     stdMax = max(stdX, stdY)
 
-    plt.plot(centerX, centerY, color='r', marker=".")
-    plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=stdMax)
+    #plt.plot(centerX, centerY, color='r', marker=".")
 
-    #plt.add_patch(patches.Circle((centerX, centerY),radius=stdMax))
+    plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
 
-    #plt.fill_between([minX, maxX], [o[:,0], o[:,1]], )
+    if i == 0:
+        h, w = samplingImage.shape[:2]
+        mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
 
+        mask[wholeMask] = 0
+
+        samplingImage[~mask] = 0
+        masks.append(mask)
+        i+=1
+
+plt.imshow(samplingImage)
 plt.show()
