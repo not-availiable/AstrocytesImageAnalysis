@@ -1,7 +1,8 @@
+import sys
 import numpy as np
 import numpy.ma as ma
 from cellpose import plot, utils
-from matplotlib import pyplot as plt, patches
+from matplotlib import pyplot as plt
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -15,8 +16,9 @@ def create_circular_mask(h, w, center=None, radius=None):
     mask = dist_from_center <= radius
     return mask
 
-dat = np.load('/home/bob/Downloads/TrainingSet/32_0_seg.npy', allow_pickle=True).item()
-
+f = open("maskLocation.txt")
+dat = np.load(f.readline().rstrip(), allow_pickle=True).item()
+f.close()
 # plot image with masks overlaid
 # mask_RGB = plot.mask_overlay(dat['img'], dat['masks'],
 #                         colors=np.array(dat['colors']))
@@ -24,9 +26,9 @@ dat = np.load('/home/bob/Downloads/TrainingSet/32_0_seg.npy', allow_pickle=True)
 # plot image with outlines overlaid in red
 outlines = utils.outlines_list(dat['masks'])
 
-#print(dat['masks'][0][0])
-
-samplingImage = plt.imread('/home/bob/Downloads/TrainingSet/32_0.tiff')
+f = open("imgLocation.txt")
+samplingImage = plt.imread(f.readline().rstrip())
+f.close()
 
 masks = []
 wholeMask = dat['masks']
