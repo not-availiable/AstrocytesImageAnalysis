@@ -64,15 +64,16 @@ for o in outlines:
 
     plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
 
-    if i == 0:
-        h, w = samplingImage.shape[:2]
-        mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
+    h, w = samplingImage.shape[:2]
+    mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
+    mask[wholeMask] = 0
+    masks.append(mask)
 
-        mask[wholeMask] = 0
+fullMask = np.zeros(wholeMask.shape)
+for mask in masks:
+    fullMask = np.add(fullMask, mask)
+fullMask = fullMask > 0
 
-        samplingImage[~mask] = 0
-        masks.append(mask)
-        i+=1
-
+samplingImage[~fullMask] = 0
 plt.imshow(samplingImage)
 plt.show()
