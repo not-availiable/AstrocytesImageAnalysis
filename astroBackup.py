@@ -39,9 +39,10 @@ if __name__ == '__main__':
     nucWholeMask = nucWholeMask > 0
 
     cytoWholeMask = cytoDat['masks']
+    cytoWholeMask = cytoWholeMask > 0
 
-    # i = 0
-    for o in nucOutlines:
+    i = 0
+    for o, c in zip(nucOutlines, cytoOutlines):
         # nuclei
         # get average x and y
         centerX = 0
@@ -50,7 +51,7 @@ if __name__ == '__main__':
         maxX = o[:,0][0]
 
         plt.plot(o[:,0], o[:,1], color='r')
-        # plt.plot(c[:,0], c[:,1], color='r')
+        plt.plot(c[:,0], c[:,1], color='r')
 
         for x in o[:,0]:
             centerX+=x
@@ -70,38 +71,26 @@ if __name__ == '__main__':
 
         #plt.plot(centerX, centerY, color='r', marker=".")
 
-        # cytoplasm
-        # see if there is a cytoplasm that is close enough to a nucleus to use
-        hasCloseCytoplasm = False
-        closeMaskId = 1
-        for c in cytoOutlines: 
-            cytoCenterX = 0
-            cytoCenterY = 0
-            for x in c[:,0]:
-                cytoCenterX+=x
-            for y in c[:,1]:
-                cytoCenterY += y
-            cytoCenterX /= len(c[:,0])
-            cytoCenterY /= len(c[:,1])
-            if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
-                hasCloseCytoplasm = True
-                break
-            closeMaskId+=1
+        # cytoplasm 
+        cytoCenterX = 0
+        cytoCenterY = 0
+        for x in c[:,0]:
+            cytoCenterX+=x
+        for y in c[:,1]:
+            cytoCenterY += y
+        cytoCenterX /= len(c[:,0])
+        cytoCenterY /= len(c[:,1])
 
-        # use only the relavant part of the cytoplasm mask 
-        mask = cytoWholeMask == closeMaskId
-        # use original circle method if there are no valid cytoplasm masks
-        if not hasCloseCytoplasm:
+        mask = cytoWholeMask
+
+        if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) > 200:
             plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
             h, w = samplingImage.shape[:2]
             mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
-        
-        # remove the nucleus from the mask
+            
         mask[nucWholeMask] = 0
         masks.append(mask)
-        # i+=1
 
-    # stitch together all of the masks
     fullMask = np.zeros(nucWholeMask.shape)
     for mask in masks:
         fullMask = np.add(fullMask, mask)
