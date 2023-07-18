@@ -107,15 +107,9 @@ if __name__ == '__main__':
         fullMask = np.add(fullMask, mask)
     fullMask = fullMask > 0
 
-    samplingImage_copy = np.copy(samplingImage)
-    samplingImage_copy[~fullMask] = 0
-    plt.imshow(samplingImage_copy)
-    plt.show()
-    
     samplingImage[~fullMask] = 0
     plt.imshow(samplingImage)
     plt.show()
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-
