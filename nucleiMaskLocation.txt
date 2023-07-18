@@ -1,1 +1,0 @@
-/home/bob/Downloads/TrainingSet/32_0_seg.npy
