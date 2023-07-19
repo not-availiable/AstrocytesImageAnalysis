@@ -1,1 +1,0 @@
-/Users/genechang/Downloads/TrainingData01/1_seg.npy
