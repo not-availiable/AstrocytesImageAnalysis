@@ -1,5 +1,5 @@
 # AstrocytesImageAnalysis
-# This github repo contains code relating to the UCSD OPALS astrocyte cell connection detection project by group 15.
+# This github repo contains code relating to the UCSD OPALS astrocyte project by group 15.
 (the readme will look prettier later I promise)
 All code is for python but different OS systems may need to adjust accordingly. 
 
