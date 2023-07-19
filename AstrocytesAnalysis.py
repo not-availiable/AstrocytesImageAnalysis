@@ -70,8 +70,13 @@ def displayData():
         fullMask = np.add(fullMask, mask)
     fullMask = fullMask > 0
 
-    samplingImage[~fullMask] = 0
-    plt.imshow(samplingImage)
+    # Create a copy of the samplingImage array to read and modify
+    modifiedImage = np.copy(samplingImage)
+
+    # Set the pixels outside the fullMask to 0
+    modifiedImage[~fullMask] = 0
+
+    plt.imshow(modifiedImage)
     plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):

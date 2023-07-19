@@ -1,1 +1,1 @@
-/home/bob/Downloads/TrainingSet/32_0_seg.npy
+/Users/genechang/Downloads/TrainingData01/1_seg.npy
