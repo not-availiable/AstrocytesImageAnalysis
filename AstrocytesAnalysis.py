@@ -2,7 +2,7 @@ import sys
 import math
 import numpy as np
 import numpy.ma as ma
-from cellpose import plot, utils
+from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
 
@@ -64,12 +64,22 @@ def generate_masks():
         mask[nucWholeMask] = 0
         masks.append(mask)
 
-def displayData():
+def sample_data():
+    global graphData
+    temp = []
+    for mask in masks:
+        intensity = np.sum(samplingImage[~mask]) / np.sum(mask)
+        temp.append(intensity)
+    graphData = np.hstack((graphData, temp))
+    print(graphData[0])
+
+def display_data():
     fullMask = np.zeros(nucWholeMask.shape)
     for mask in masks:
         fullMask = np.add(fullMask, mask)
     fullMask = fullMask > 0
 
+<<<<<<< Updated upstream
     # Create a copy of the samplingImage array to read and modify
     modifiedImage = np.copy(samplingImage)
 
@@ -77,6 +87,16 @@ def displayData():
     modifiedImage[~fullMask] = 0
 
     plt.imshow(modifiedImage)
+=======
+    samplingImage[~fullMask] = 0
+    plt.imshow(samplingImage)
+
+    temp = np.array([0])
+
+    for i in range(9):
+        plt.subplot(5, 2, i+1).plot(0, graphData[i], marker=".", markersize=15)
+
+>>>>>>> Stashed changes
     plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -96,20 +116,33 @@ if __name__ == '__main__':
 
     nucDat = np.load(load_image_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
     cytoDat = np.load(load_image_path("cytoMaskLocation.txt"), allow_pickle=True).item()
+    samplingImage = plt.imread(load_image_path("imgLocation.txt"))
+
+    nucModel = models.CellposeModel(pretrained_model=load_image_path("nucleiModelLocation.txt"))
+    cytoModel = models.CellposeModel(pretrained_model=load_image_path("cytoModelLocation.txt"))
+
+    #nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
+    #cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
 
     # plot image with outlines overlaid in red
     nucOutlines = utils.outlines_list(nucDat['masks'])
+    #nucOutlines = utils.outlines_list(nucDat)
     cytoOutlines = utils.outlines_list(cytoDat['masks'])
-
-    samplingImage = plt.imread(load_image_path("imgLocation.txt"))
+    #cytoOutlines = utils.outlines_list(cytoDat)
 
     masks = []
     nucWholeMask = nucDat['masks']
+    #nucWholeMask = nucDat
     nucWholeMask = nucWholeMask > 0
 
     cytoWholeMask = cytoDat['masks']
+    #cytoWholeMask = cytoDat
 
     generate_masks()
 
+    graphData = np.array(())
+
+    sample_data()
+    
     # stitch together all of the masks
-    displayData()
+    display_data()
