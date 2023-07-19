@@ -79,15 +79,6 @@ def display_data():
         fullMask = np.add(fullMask, mask)
     fullMask = fullMask > 0
 
-<<<<<<< Updated upstream
-    # Create a copy of the samplingImage array to read and modify
-    modifiedImage = np.copy(samplingImage)
-
-    # Set the pixels outside the fullMask to 0
-    modifiedImage[~fullMask] = 0
-
-    plt.imshow(modifiedImage)
-=======
     samplingImage[~fullMask] = 0
     plt.imshow(samplingImage)
 
@@ -96,7 +87,6 @@ def display_data():
     for i in range(9):
         plt.subplot(5, 2, i+1).plot(0, graphData[i], marker=".", markersize=15)
 
->>>>>>> Stashed changes
     plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
