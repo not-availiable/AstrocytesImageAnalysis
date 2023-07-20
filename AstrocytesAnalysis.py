@@ -68,10 +68,21 @@ def sample_data():
     global graphData
     temp = []
     i = 0
+    first_frame_intensity = None
+
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-        temp.append(intensity)
-        i+=1
+
+        # First frame intensity
+        if i == 0:
+            first_frame_intensity = intensity
+
+        # Normalize the intensity
+        normalized_intensity = (intensity - np.min(samplingImage[mask])) / first_frame_intensity
+
+        temp.append(normalized_intensity)
+        i += 1
+
     graphData = np.hstack((graphData, temp))
 
 def display_data():
