@@ -81,7 +81,7 @@ def sample_data():
         normalized_intensity = (intensity - np.min(samplingImage)) / first_frame_intensity
         temp.append(normalized_intensity)
 
-    graphData = np.hstack((graphData, temp))
+    graphData = np.column_stack((graphData, temp))
 
 def display_data():
     global graphData
