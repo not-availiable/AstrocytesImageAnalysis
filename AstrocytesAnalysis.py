@@ -71,14 +71,14 @@ def save_masks(masks):
 def sample_data():
     global graphData
     temp = []
-    first_frame_intensity = None  # Store the intensity of the first frame
+    min_intensity = None  # Store the minimum intensity for each image
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
 
-        if first_frame_intensity is None:
-            first_frame_intensity = intensity  # Save the intensity of the first frame
+        if min_intensity is None or intensity < min_intensity:
+            min_intensity = intensity  # Update the minimum intensity for each image
 
-        normalized_intensity = (intensity - np.min(samplingImage)) / first_frame_intensity
+        normalized_intensity = (intensity - np.min(samplingImage)) / (min_intensity - np.min(samplingImage))
         temp.append(normalized_intensity)
 
     graphData = np.column_stack((graphData, temp))
