@@ -69,11 +69,19 @@ def save_masks(masks):
     np.save("masks.npy",combined_mask)
 
 def sample_data():
+    global graphData
     temp = []
+    first_frame_intensity = None  # Store the intensity of the first frame
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-        temp.append(intensity)
-    graphData = np.column_stack((graphData, temp))
+
+        if first_frame_intensity is None:
+            first_frame_intensity = intensity  # Save the intensity of the first frame
+
+        normalized_intensity = (intensity - np.min(samplingImage)) / first_frame_intensity
+        temp.append(normalized_intensity)
+
+    graphData = np.hstack((graphData, temp))
 
 def display_data():
     global graphData
