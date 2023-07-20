@@ -130,8 +130,8 @@ if __name__ == '__main__':
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
 
-    nucModel = models.CellposeModel(pretrained_model=load_path("nucleiModelLocation.txt"))
-    cytoModel = models.CellposeModel(pretrained_model=load_path("cytoModelLocation.txt"))
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=load_path("nucleiModelLocation.txt"))
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=load_path("cytoModelLocation.txt"))
 
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
