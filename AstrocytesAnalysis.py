@@ -6,6 +6,10 @@ import numpy.ma as ma
 from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
+import time
+
+#start timer to measure how long code takes to execute
+start_time=time.time()
 
 # Load the configuration file
 with open("config.json") as f:
@@ -98,7 +102,9 @@ def display_data():
     for i in range(9):
         print(graphData[i])
         plt.subplot(5, 2, i+1).plot(graphData[i], marker=".", markersize=15)
-
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
     plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
