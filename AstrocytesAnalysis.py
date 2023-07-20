@@ -14,18 +14,11 @@ def load_path(file):
     return path
 
 def get_center_location(o):
-    centerX = 0
-    centerY = 0
-
-    for x in o[:,0]:
-        centerX+=x
-    for y in o[:,1]:
-        centerY += y
-    centerX /= len(o[:,0])
-    centerY /= len(o[:,1])
-
+    #takes average
+    centerX = np.mean(o[:,0])
+    centerY = np.mean(o[:,1])
     return centerX, centerY
-
+    #use "return o[:, 0].mean(), o[:, 1].mean()" for faster runtime
 def generate_masks():
     for o in nucOutlines:
         # nuclei
@@ -130,8 +123,8 @@ if __name__ == '__main__':
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
 
-    nucModel = models.CellposeModel(pretrained_model=load_path("nucleiModelLocation.txt"))
-    cytoModel = models.CellposeModel(pretrained_model=load_path("cytoModelLocation.txt"))
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=load_path("nucleiModelLocation.txt"))
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=load_path("cytoModelLocation.txt"))
 
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
