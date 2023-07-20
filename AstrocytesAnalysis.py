@@ -65,21 +65,17 @@ def generate_masks():
         masks.append(mask)
 
 def sample_data():
-    global graphData
     temp = []
-    i = 0
     first_frame_intensity = None  # Store the intensity of the first frame
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
 
         if first_frame_intensity is None:
-            first_frame_intensity = intensity  # Save the intensity of the first frame
-
+            first_frame_intensity = intensity 
         normalized_intensity = (intensity - np.min(samplingImage)) / first_frame_intensity
         temp.append(normalized_intensity)
-        i += 1
-    graphData = np.hstack((graphData, temp))
 
+    return np.array(temp)
 
 def display_data():
     fullMask = np.zeros(nucWholeMask.shape)
