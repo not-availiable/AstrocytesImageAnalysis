@@ -67,16 +67,20 @@ def generate_masks():
 def sample_data():
     global graphData
     temp = []
+    i = 0
     for mask in masks:
-        intensity = np.sum(samplingImage[~mask]) / np.sum(mask)
+        intensity = np.sum(samplingImage[mask]) / np.sum(mask)
         temp.append(intensity)
+        i+=1
     graphData = np.hstack((graphData, temp))
-    print(graphData[0])
 
 def display_data():
     fullMask = np.zeros(nucWholeMask.shape)
+    i = 0
     for mask in masks:
-        fullMask = np.add(fullMask, mask)
+        if i == 6:
+            fullMask = np.add(fullMask, mask)
+        i+=1
     fullMask = fullMask > 0
 
     samplingImage[~fullMask] = 0
