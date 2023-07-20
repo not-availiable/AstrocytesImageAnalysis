@@ -7,6 +7,7 @@ from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
 import time
+import json
 
 #start timer to measure how long code takes to execute
 start_time=time.time()
