@@ -15,10 +15,11 @@ def load_path(file):
 
 def get_center_location(o):
     #takes average
-    centerX = np.mean(o[:,0])
-    centerY = np.mean(o[:,1])
-    return centerX, centerY
-    #use "return o[:, 0].mean(), o[:, 1].mean()" for faster runtime
+    return o[:, 0].mean(), o[:, 1].mean()
+    """         centerX = np.mean(o[:,0]) 
+                centerY = np.mean(o[:,1])
+                return centerX, centerY
+                use only if main code doesn't work"""
 def generate_masks():
     for o in nucOutlines:
         # nuclei
