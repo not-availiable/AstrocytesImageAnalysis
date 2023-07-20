@@ -109,7 +109,6 @@ def create_circular_mask(h, w, center=None, radius=None):
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    firstSample = True
 
     # for quick running a single image
     #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
