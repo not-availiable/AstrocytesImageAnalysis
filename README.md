@@ -1,7 +1,8 @@
 # AstrocytesImageAnalysis
 # This github repo contains code relating to the UCSD OPALS astrocyte project by group 15.
 (the readme will look prettier later I promise)
-#IMPORTANT INFO FOR CONFIG FILE
+
+# IMPORTANT INFO FOR CONFIG FILE
   Put the path to the models directly into the config file in between the quotations.
 All code is for python but different OS systems may need to adjust accordingly. 
 
