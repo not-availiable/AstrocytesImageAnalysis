@@ -69,7 +69,6 @@ def save_masks(masks):
     np.save("masks.npy",combined_mask)
 
 def sample_data():
-    global graphData
     temp = []
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
