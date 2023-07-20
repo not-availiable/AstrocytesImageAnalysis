@@ -14,16 +14,8 @@ def load_path(file):
     return path
 
 def get_center_location(o):
-    centerX = 0
-    centerY = 0
-
-    for x in o[:,0]:
-        centerX+=x
-    for y in o[:,1]:
-        centerY += y
-    centerX /= len(o[:,0])
-    centerY /= len(o[:,1])
-
+    centerX = np.mean(o[:,0])
+    centerY = np.mean(o[:,1])
     return centerX, centerY
 
 def generate_masks():
