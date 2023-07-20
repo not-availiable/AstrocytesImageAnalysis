@@ -7,6 +7,10 @@ from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
 
+# Load the configuration file
+with open("config.json") as f:
+    config = json.load(f)
+
 def load_path(file):
     f = open(file)
     path = f.readline().rstrip()
@@ -116,7 +120,7 @@ if __name__ == '__main__':
     #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
     #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
 
-    dirPath = load_path("directoryLocation.txt")
+    dirPath = config["directory_location"]
 
     imagePaths = os.listdir(dirPath)
 
@@ -124,8 +128,8 @@ if __name__ == '__main__':
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
 
-    nucModel = models.CellposeModel(gpu=True, pretrained_model=load_path("nucleiModelLocation.txt"))
-    cytoModel = models.CellposeModel(gpu=True, pretrained_model=load_path("cytoModelLocation.txt"))
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=config["nuclei_model_location"])
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=config["cyto_model_location"])
 
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
