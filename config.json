@@ -1,5 +1,5 @@
 {
-    "directory_location": "",
-    "nuclei_model_location": "",
-    "cyto_model_location": ""
+    "directory_location": "/home/bob/Downloads/PostTiffs",
+    "nuclei_model_location": "/home/bob/Downloads/TrainingSet/models/AstroNuclei2",
+    "cyto_model_location": "home/bob/Downloads/TrainingSet/models/CytoplasmCellPose"
 }
