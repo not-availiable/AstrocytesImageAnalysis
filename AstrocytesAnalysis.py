@@ -6,13 +6,23 @@ import numpy.ma as ma
 from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
+import time
+import json
 
-def load_path(file):
+#start timer to measure how long code takes to execute
+start_time=time.time()
+
+# Load the configuration file
+with open("config.json") as f:
+    config = json.load(f)
+
+"""def load_path(file):
     f = open(file)
     path = f.readline().rstrip()
     f.close()
     return path
-
+Use only if neccesary. Been replaced by the config.json file
+    """
 def get_center_location(o):
     #takes average
     return o[:, 0].mean(), o[:, 1].mean()
@@ -94,7 +104,9 @@ def display_data():
     for i in range(9):
         print(graphData[i])
         plt.subplot(5, 2, i+1).plot(graphData[i], marker=".", markersize=15)
-
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
     plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -116,7 +128,7 @@ if __name__ == '__main__':
     #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
     #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
 
-    dirPath = load_path("directoryLocation.txt")
+    dirPath = config["directory_location"]
 
     imagePaths = os.listdir(dirPath)
 
@@ -124,8 +136,8 @@ if __name__ == '__main__':
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
 
-    nucModel = models.CellposeModel(gpu=True, pretrained_model=load_path("nucleiModelLocation.txt"))
-    cytoModel = models.CellposeModel(gpu=True, pretrained_model=load_path("cytoModelLocation.txt"))
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=config["nuclei_model_location"])
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=config["cyto_model_location"])
 
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
