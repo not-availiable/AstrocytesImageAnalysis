@@ -16,12 +16,13 @@ start_time=time.time()
 with open("config.json") as f:
     config = json.load(f)
 
-def load_path(file):
+"""def load_path(file):
     f = open(file)
     path = f.readline().rstrip()
     f.close()
     return path
-
+Use only if neccesary. Been replaced by the config.json file
+    """
 def get_center_location(o):
     #takes average
     return o[:, 0].mean(), o[:, 1].mean()
