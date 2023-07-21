@@ -1,7 +1,7 @@
 import os
 
-input_folder = '/Users/genechang/Downloads/PreTiffs'
-output_folder = '/Users/genechang/Downloads/pretiffsorganized'
+input_folder = 'input folder'
+output_folder = 'output folder'
 
 # Create the output folder if it doesn't exist
 if not os.path.exists(output_folder):
