@@ -1,27 +1,21 @@
 import os
 
-input_folder = 'input folder'
-output_folder = 'output folder'
+# Replace 'path_to_folder' with the path to your main folder containing the subfolders with TIFF files.
+path_to_folder = 'path to allcellstiffs'
 
-# Create the output folder if it doesn't exist
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+# Function to add leading zeros to file names
+def rename_files_with_leading_zeros(folder_path):
+    for root, _, files in os.walk(folder_path):
+        for file_name in files:
+            if file_name.endswith('.tiff'):
+                file_path = os.path.join(root, file_name)
+                file_num = int(file_name.split('.')[0])
+                new_file_name = f"{file_num:03d}.tiff"  # Adds leading zeros to make it three digits (adjust as needed)
 
-# Get a list of files in the input folder
-files = os.listdir(input_folder)
+                if file_name != new_file_name:
+                    new_file_path = os.path.join(root, new_file_name)
+                    os.rename(file_path, new_file_path)
+                    print(f"Renamed {file_path} to {new_file_path}")
 
-# Sort the filenames numerically (without leading zeros)
-sorted_files = sorted(files, key=lambda x: int(os.path.splitext(x)[0]))
-
-# Calculate the number of leading zeros needed
-num_zeros = len(str(len(sorted_files)))
-
-# Rename and move the files to the output folder
-for i, filename in enumerate(sorted_files):
-    file_extension = os.path.splitext(filename)[1]
-    new_filename = f"{str(i+1).zfill(num_zeros)}{file_extension}"
-    input_path = os.path.join(input_folder, filename)
-    output_path = os.path.join(output_folder, new_filename)
-    os.rename(input_path, output_path)
-
-print("Renaming and sorting complete!")
+# Call the function to add leading zeros to all TIFF files in the folders
+rename_files_with_leading_zeros(path_to_folder)
