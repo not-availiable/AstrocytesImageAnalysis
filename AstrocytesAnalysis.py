@@ -22,10 +22,6 @@ def load_path(file):
 def get_center_location(o):
     #takes average
     return o[:, 0].mean(), o[:, 1].mean()
-    """         centerX = np.mean(o[:,0]) 
-                centerY = np.mean(o[:,1])
-                return centerX, centerY
-                use only if main code doesn't work"""
 def generate_masks():
     for o in nucOutlines:
         # nuclei
@@ -70,17 +66,17 @@ def save_masks(masks):
 
 def sample_data():
     global graphData
-    temp = []
-    min_intensity = None  # Store the minimum intensity for each image
-    for mask in masks:
-        intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-
-        if min_intensity is None or intensity < min_intensity:
-            min_intensity = intensity  # Update the minimum intensity for each image
-
-        normalized_intensity = (intensity - np.min(samplingImage)) / (min_intensity - np.min(samplingImage))
+    # compute
+    intensities = np.array([np.sum(samplingImage[mask]) for mask in masks]) / mask_sums
+    # initialize minimum intensity
+    min_intensity = intensities[0]
+    # initialize output list
+    temp = [(intensities[0] - min_samplingImage) / (min_intensity - min_samplingImage)]
+    for i in range(1, len(intensities)):
+        if intensities[i] < min_intensity:
+            min_intensity = intensities[i]
+        normalized_intensity = (intensities[i] - min_samplingImage) / (min_intensity - min_samplingImage)
         temp.append(normalized_intensity)
-
     graphData = np.column_stack((graphData, temp))
 
 def display_data():
