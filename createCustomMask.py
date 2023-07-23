@@ -8,15 +8,8 @@ from matplotlib import pyplot as plt
 import tifffile as tf
 import cv2
 def findCenterOfMask(mask):
-    cytoCenterX = 0
-    cytoCenterY = 0
-    for x in mask[:,0]:
-        cytoCenterX+=x
-    for y in mask[:,1]:
-        cytoCenterY += y
-    cytoCenterX /= len(mask[:,0])
-    cytoCenterY /= len(mask[:,1])
-    return cytoCenterX,cytoCenterY
+    #vectorized mean (speed)
+    return mask[:, 0].mean(), mask[:, 1].mean()
                    
 def createTif(image,shockIndex,otherMaskIndex,bigMask,pathing):
     tiff = np.copy(image)
