@@ -9,6 +9,7 @@ import multiprocessing
 import time
 import json
 from natsort import natsorted
+from tqdm import tqdm
 
 #start timer to measure how long code takes to execute
 start_time=time.time()
@@ -22,15 +23,14 @@ def load_path(file):
 def get_center_location(o):
     #takes average
     return o[:, 0].mean(), o[:, 1].mean()
-    """         centerX = np.mean(o[:,0]) 
-                centerY = np.mean(o[:,1])
-                return centerX, centerY
-                use only if main code doesn't work"""
+
 def generate_masks():
+    i = 0
     for o in nucOutlines:
         # nuclei
         # get average x and y
         centerX, centerY = get_center_location(o)
+        plt.annotate(str(i), (centerX, centerY), color="white")
 
         plt.plot(o[:,0], o[:,1], color='r')
 
@@ -61,6 +61,7 @@ def generate_masks():
         # remove the nucleus from the mask
         mask[nucWholeMask] = 0
         masks.append(mask)
+        i+=1
 
 def save_masks(masks):
     combined_mask = np.empty(())
@@ -68,24 +69,23 @@ def save_masks(masks):
         combined_mask = np.dstack(combined_mask, mask)
     np.save("masks.npy",combined_mask)
 
-def sample_data():
-    global graphData
+def sample_data(graphData, first_image_sample, first_image_normalized_intensities):
     temp = []
-    min_intensity = None  # Store the minimum intensity for each image
+    min_intensity = np.min(samplingImage)
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-
-        if min_intensity is None or intensity < min_intensity:
-            min_intensity = intensity  # Update the minimum intensity for each image
-
-        normalized_intensity = (intensity - np.min(samplingImage)) / (min_intensity - np.min(samplingImage))
+        normalized_intensity = (intensity - min_intensity)
         temp.append(normalized_intensity)
+        if first_image_sample:
+            first_image_normalized_intensities.append(normalized_intensity)
+    
+    first_image_sample = False
+    temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
     graphData = np.column_stack((graphData, temp))
+    return graphData, first_image_sample, first_image_normalized_intensities
 
-def display_data():
-    global graphData
-
+def display_data(graphData):
     graphData = np.delete(graphData, 0, 1)
 
     fullMask = np.zeros(nucWholeMask.shape)
@@ -94,16 +94,33 @@ def display_data():
     fullMask = fullMask > 0
 
     # for displaying the main image (subplot must be commented)
-    #samplingImage[~fullMask] = 0
-    #plt.imshow(samplingImage)
+    samplingImage[~fullMask] = 0
+    plt.imshow(samplingImage)
 
-    for i in range(9):
-        print(graphData[i])
-        plt.subplot(5, 2, i+1).plot(graphData[i])
+    plt.savefig("masks", format="png")
+
+    split_point = len(pre_image_paths)
+
+    post_offset = []
+    for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
+        post_offset.append(i)
+
+    for i in range(len(masks)):
+        plt.clf()
+        # pre graph
+        plt.plot(graphData[i][:split_point], color="blue")
+        # connecting line
+        x_points = np.array([split_point-1, split_point])
+        y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
+        plt.plot(x_points, y_points, color="red")
+        # post graph
+        plt.plot(post_offset, graphData[i][split_point:], color="red")
+        plt.savefig("plot" + str(i), format="png")
+
+    
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"The function took {execution_time} seconds to run.")
-    plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -125,25 +142,28 @@ if __name__ == '__main__':
     with open("config.json") as f:
         config = json.load(f)
 
-    print(config["nuclei_model_location"])
-
     # for quick running a single image
     #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
     #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
 
-    dirPath = config["directory_location"]
+    pre_dir_path = config["pre_directory_location"]
+    post_dir_path = config["post_directory_location"]
 
-    imagePaths = os.listdir(dirPath)
+    pre_image_paths = os.listdir(pre_dir_path)
+    pre_image_paths = natsorted(pre_image_paths)
 
-    imagePaths = natsorted(imagePaths)
-    print(imagePaths)
+    post_image_paths = os.listdir(post_dir_path)
+    post_image_paths = natsorted(post_image_paths)
 
-    samplingImage = plt.imread(os.path.join(dirPath, imagePaths[0]))
+    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
+    first_image_sample = True
+    first_image_normalized_intensities = []
+
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
 
-    nucModel = models.CellposeModel(gpu=True, pretrained_model=load_path("nucleiModelLocation.txt"))
-    cytoModel = models.CellposeModel(gpu=True, pretrained_model=load_path("cytoModelLocation.txt"))
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
@@ -172,14 +192,20 @@ if __name__ == '__main__':
 
     graphData = np.zeros(len(masks))
 
-    sample_data()
+    graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
 
     i = 0
-    for imagePath in imagePaths:
+    for image_path in tqdm(pre_image_paths):
         if i > 0:
-            samplingImage = plt.imread(os.path.join(dirPath, imagePaths[i]))
-            sample_data()
+            samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[i]))
+            graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
+        i+=1
+
+    i = 0
+    for image_path in tqdm(post_image_paths):
+        samplingImage = plt.imread(os.path.join(post_dir_path, post_image_paths[i]))
+        graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
         i+=1
 
     # stitch together all of the masks
-    display_data()
+    display_data(graphData)
