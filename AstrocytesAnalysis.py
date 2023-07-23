@@ -23,11 +23,11 @@ def get_center_location(o):
     #takes average
     return o[:, 0].mean(), o[:, 1].mean()
 def generate_masks():
+    cyto_centers = np.array([get_center_location(c) for c in cytoOutlines])  # convert list of tuples to 2D numpy array
     for o in nucOutlines:
         # nuclei
         # get average x and y
         centerX, centerY = get_center_location(o)
-
         plt.plot(o[:,0], o[:,1], color='r')
 
         #get standard deviation
@@ -36,20 +36,14 @@ def generate_masks():
         stdMax = max(stdX, stdY)
 
         # cytoplasm
-        # see if there is a cytoplasm that is close enough to a nucleus to use
-        hasCloseCytoplasm = False
-        closeMaskId = 1
-        for c in cytoOutlines: 
-            cytoCenterX, cytoCenterY = get_center_location(c)
-            if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
-                hasCloseCytoplasm = True
-                break
-            closeMaskId+=1
-
-        # use only the relavant part of the cytoplasm mask 
-        mask = cytoWholeMask == closeMaskId
-        # use original circle method if there are no valid cytoplasm masks
-        if not hasCloseCytoplasm:
+        distances = np.sqrt(np.sum((cyto_centers - np.array([centerX, centerY]))**2, axis=1))  
+        close_cytoplasm_indices = np.where(distances < 50)[0]  # Find indices where distance is less than 50
+        if close_cytoplasm_indices.size > 0:
+            # there is a cytoplasm that is close enough to a nucleus to use
+            # use only the relevant part of the cytoplasm mask 
+            mask = cytoWholeMask == close_cytoplasm_indices[0] + 1
+        else:
+            # use original circle method if there are no valid cytoplasm masks
             plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
             h, w = samplingImage.shape[:2]
             mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
@@ -57,7 +51,6 @@ def generate_masks():
         # remove the nucleus from the mask
         mask[nucWholeMask] = 0
         masks.append(mask)
-
 def save_masks(masks):
     combined_mask = np.empty(())
     for mask in masks:
