@@ -1,3 +1,4 @@
+from audioop import mul
 import sys
 import os
 import math
@@ -10,6 +11,8 @@ import time
 import json
 from natsort import natsorted
 from tqdm import tqdm
+import concurrent.futures
+from multiprocessing import Pool
 
 #start timer to measure how long code takes to execute
 start_time=time.time()
@@ -69,7 +72,17 @@ def save_masks(masks):
         combined_mask = np.dstack(combined_mask, mask)
     np.save("masks.npy",combined_mask)
 
-def sample_data(graphData, first_image_sample, first_image_normalized_intensities):
+def sample_data(filedata):
+    #global graphData
+    global first_image_sample
+    global first_image_normalized_intensities
+
+    filepath, insert_index = filedata
+
+    print(insert_index)
+
+    samplingImage = plt.imread(filepath)
+
     temp = []
     min_intensity = np.min(samplingImage)
     for mask in masks:
@@ -82,12 +95,12 @@ def sample_data(graphData, first_image_sample, first_image_normalized_intensitie
     first_image_sample = False
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
-    graphData = np.column_stack((graphData, temp))
-    return graphData, first_image_sample, first_image_normalized_intensities
+    #graphData[:,insert_index] = temp
+    return temp, insert_index
 
 def display_data(graphData):
-    graphData = np.delete(graphData, 0, 1)
-
+    graphData = np.delete(graphData, len(graphData), 1)
+    
     fullMask = np.zeros(nucWholeMask.shape)
     for mask in masks:
         fullMask = np.add(fullMask, mask)
@@ -114,7 +127,7 @@ def display_data(graphData):
         y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
         plt.plot(x_points, y_points, color="red")
         # post graph
-        plt.plot(post_offset, graphData[i][split_point:], color="red")
+        plt.plot(post_offset, graphData[i][split_point-1:], color="red")
         plt.savefig("plot" + str(i), format="png")
 
     
@@ -190,22 +203,32 @@ if __name__ == '__main__':
     generate_masks()
     #save_masks(masks)
 
-    graphData = np.zeros(len(masks))
+    graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
+    print(np.shape(graphData))
 
-    graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
+    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
+
+    temp = []
+    insert_index = 0
+
+    temp, insert_index = sample_data(full_image_data[0])
+    graphData[:,insert_index] = temp
 
     i = 0
-    for image_path in tqdm(pre_image_paths):
+    for image_path in pre_image_paths:
         if i > 0:
-            samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[i]))
-            graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
+            full_image_data.append((os.path.join(pre_dir_path, image_path), i))
         i+=1
 
-    i = 0
-    for image_path in tqdm(post_image_paths):
-        samplingImage = plt.imread(os.path.join(post_dir_path, post_image_paths[i]))
-        graphData, first_image_sample, first_image_normalized_intensities = sample_data(graphData, first_image_sample, first_image_normalized_intensities)
+    for image_path in post_image_paths:
+        full_image_data.append((os.path.join(post_dir_path, image_path), i))
         i+=1
+
+
+    p = Pool(16)
+    for result in p.map(sample_data, full_image_data):
+        temp, insert_index = result
+        graphData[:,insert_index] = temp
 
     # stitch together all of the masks
     display_data(graphData)
