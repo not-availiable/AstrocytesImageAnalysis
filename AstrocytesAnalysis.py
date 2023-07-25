@@ -11,7 +11,6 @@ import time
 import json
 from natsort import natsorted
 from tqdm import tqdm
-import concurrent.futures
 from multiprocessing import Pool
 
 #start timer to measure how long code takes to execute
@@ -223,7 +222,6 @@ if __name__ == '__main__':
     for image_path in post_image_paths:
         full_image_data.append((os.path.join(post_dir_path, image_path), i))
         i+=1
-
 
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
