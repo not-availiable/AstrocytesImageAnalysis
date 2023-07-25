@@ -8,7 +8,7 @@ from scipy import ndimage
 from cellpose import models, utils
 
 # GLOBAL VARIABLES
-connectionMap = np.zeros((1)) # 0 = not connected, 1 = connected, 2 = networked
+
 SIZE = 576
 
 # Test of A* Algorithm using a premade array
@@ -102,7 +102,7 @@ def a_star_search(grid, src, dest, si, di):
     for x in range(len(grid)):
         for y in range(len(grid[0])):
             if closed_list[x][y]:
-                distance = calculate_h_value(x, y, goal)
+                distance = calculate_h_value(x, y, dest)
                 if distance < min_distance:
                     min_distance = distance
                     nearest_square = (x, y)
@@ -127,66 +127,77 @@ def a_star_search(grid, src, dest, si, di):
 # print()
 
 # Getting a test image (not being used in the model yet)
-image = cv2.imread('/Users/connor/Downloads/TrainingSet/34_1.tiff')
-img = np.copy(image)
-background = int(abs(np.mean(img) - np.median(img))*3)
-print(background)
-img[img < background] = 0
-img[:,:,0] = 0
-img[:,:,2] = 0
-
-nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei1'))
-nucDat = nucModel.eval(img, channels=[2,0])[0]
-nucOutlines = utils.outlines_list(nucDat)
-nucWholeMask = nucDat
-nucWholeMask = nucWholeMask > 0
-
-img[nucWholeMask==True, 1] = 255
-plt.imshow(img)
-plt.title("Removed Background")
-plt.show()
-img = cv2.resize(img, (SIZE, SIZE))
-plt.imshow(img)
-plt.title("Shrunken Image")
-plt.show()
-centers = []
-print("Removed Background")
-plt.imshow(img)
-for outline in nucOutlines:
-    centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
-    plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
-plt.show()
-print("Got Centers")
-grid = np.copy(img)[:,:,1]
-print("Created Grid")
-connectionMap = np.zeros((len(centers)))
-shockwavedCell = 4
-connectionMap[shockwavedCell] = 3
-print("Created Map")
-for i in range(len(centers)):
-    if i == shockwavedCell:
-        continue
-    grid[grid > 0] = 1
-    start = centers[i]
-    goal = centers[shockwavedCell]
-    print(f"Got Centers For Cell {i}")
-    path = a_star_search(grid, start, goal, i, shockwavedCell)
-    print(f"Got Path For Cell {i}")
-    for point in path:
-        x = point[0]
-        y = point[1]
-        grid[x][y] = 255
-    fullDistance = math.sqrt( (abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2 )
-    if (connectionMap[i] == 1):
-        connectionMap[i] = int(1.25 > len(path)/fullDistance and len(path)/fullDistance > .75)
-        print(len(path))
-    if (connectionMap[i] == 2):
-        connectionMap[i] = int(1.12688 > len(path)/fullDistance and len(path)/fullDistance > .87312) + 1
-        print(len(path))
-    print(f"Finished Cell {i}")
-    img[:,:,0] = np.copy(grid[:,:])
-    img[start[0], start[1], 2] = 255
-    img[goal[0], goal[1], 2] = 255
+def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size):
+    SIZE = size
+    image = cv2.imread(filePathNameToTiff)
+    img = np.copy(image)
+    background = int(abs(np.mean(img) - np.median(img))*3)
+    print(background)
+    img[img < background] = 0
+    img[:,:,0] = 0
+    img[:,:,2] = 0
+    
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=str(filePathNameToNucleiModel))
+    nucDat = nucModel.eval(img, channels=[2,0])[0]
+    nucOutlines = utils.outlines_list(nucDat)
+    nucWholeMask = nucDat
+    nucWholeMask = nucWholeMask > 0
+    
+    img[nucWholeMask==True, 1] = 255
     plt.imshow(img)
-    plt.title(f"Cell {i} to Cell {shockwavedCell}")
+    plt.title("Removed Background")
     plt.show()
+    img = cv2.resize(img, (SIZE, SIZE))
+    plt.imshow(img)
+    plt.title("Shrunken Image")
+    plt.show()
+    centers = []
+    print("Removed Background")
+    plt.imshow(img)
+    for outline in nucOutlines:
+        centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
+        plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
+    plt.show()
+    print("Got Centers")
+    grid = np.copy(img)[:,:,1]
+    print("Created Grid")
+    global connectionMap
+    connectionMap = np.zeros((len(centers))) # 0 = not connected, 1 = networked, 2 = connected
+    paths = []
+    shockwavedCell = 4
+    connectionMap[shockwavedCell] = 3
+    print("Created Map")
+    for i in range(len(centers)):
+        if i == shockwavedCell:
+            paths.append([0])
+            continue
+        grid[grid > 0] = 1
+        start = centers[i]
+        goal = centers[shockwavedCell]
+        print(f"Got Centers For Cell {i}")
+        path = a_star_search(grid, start, goal, i, shockwavedCell)
+        paths.append(path)
+        print(f"Got Path For Cell {i}")
+        for point in path:
+            x = point[0]
+            y = point[1]
+            grid[x][y] = 255
+        fullDistance = math.sqrt( (abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2 )
+        if (connectionMap[i] == 1):
+            connectionMap[i] = int(1.25 > len(path)/fullDistance and len(path)/fullDistance > .75)
+            print(len(path))
+        print(f"Finished Cell {i}")
+        img[:,:,0] = np.copy(grid[:,:])
+        img[start[0], start[1], 2] = 255
+        img[goal[0], goal[1], 2] = 255
+        plt.imshow(img)
+        plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        plt.show()
+    paths = np.array(paths)
+    minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
+    maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
+    for i in range(len(centers)):
+        if (connectionMap[i] == 2):
+            connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(len(centers)//4) )) + 1
+            print(len(paths[i]))
+    return connectionMap
