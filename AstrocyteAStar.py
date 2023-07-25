@@ -195,7 +195,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
     for i in range(len(centers)):
         if (connectionMap[i] == 2):
-            connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(len(centers)//4) )) + 1
+            connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
             print(len(paths[i]))
     return connectionMap
 
