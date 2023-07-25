@@ -1,21 +1,19 @@
 # Imports for the code
-from PIL import Image
 import numpy as np
-import struct
 import heapq
 import matplotlib.pyplot as plt
-import seaborn as sns
-from colorama import Fore, Style
 import cv2
 import math
+from scipy import ndimage
+
+# GLOBAL VARIABLES
+connectionMap = np.zeros((1,1)) # 0 = not connected, 1 = networked, 2 = connected
+SIZE = 576
 
 # Test of A* Algorithm using a premade array
 
-SIZE = 2304
-
 def is_valid(row, col):
     return 0 <= row < SIZE and 0 <= col < SIZE
-
 
 def is_unblocked(grid, row, col):
     return grid[row][col] == 1
@@ -71,7 +69,6 @@ def a_star_search(grid, src, dest):
     cell_details[i][j]["parent_j"] = j
 
     open_list = [(0.0, (i, j))]
-    found_dest = False
 
     while open_list:
         f, (i, j) = heapq.heappop(open_list)
@@ -82,6 +79,8 @@ def a_star_search(grid, src, dest):
                     cell_details[new_i][new_j]["parent_i"] = i
                     cell_details[new_i][new_j]["parent_j"] = j
                     print("The destination cell is found")
+                    connectionMap[src][dest] = 2
+                    connectionMap[dest][src] = 2
                     return trace_path(cell_details, dest)
 
                 if not closed_list[new_i][new_j] and is_unblocked(grid, new_i, new_j):
@@ -107,6 +106,8 @@ def a_star_search(grid, src, dest):
                 if distance < min_distance:
                     min_distance = distance
                     nearest_square = (x, y)
+    connectionMap[src][dest] = 1
+    connectionMap[dest][src] = 1
     return trace_path(cell_details, nearest_square)
 
 # Example usage:
@@ -141,14 +142,27 @@ def getCellCenter(mask):
             LatterY = max(LatterY, idx[1])
     CenterX = (FormerX + LatterX) // 2
     CenterY = (FormerY + LatterY) // 2
-    return CenterX, CenterY
+    return (CenterX, CenterY)
+
+# def getCellCenter(mask):
+#     indices = np.where(mask == 1)
+#     FormerX = np.min(indices[0])
+#     LatterX = np.max(indices[0])
+#     FormerY = np.min(indices[1])
+#     LatterY = np.max(indices[1])
+#     CenterX = (FormerX + LatterX) // 2
+#     CenterY = (FormerY + LatterY) // 2
+#     return (CenterX, CenterY)
 
 # Getting a test image (not being used in the model yet)
 image = cv2.imread('/Users/connor/Downloads/TrainingSet/34_1.tiff')
 mk = np.load('/Users/connor/Downloads/TrainingSet/34_1_seg.npy', allow_pickle=True).item()['masks']
 img = np.copy(image)
 mask = np.copy(mk)
+img = cv2.resize(img, (SIZE, SIZE))
+mask = cv2.resize(img, (SIZE, SIZE))
 plt.imshow(img)
+plt.title("Shrunken Image")
 plt.show()
 background = int(abs(np.mean(img) - np.median(img)))*3
 print(background)
@@ -156,35 +170,67 @@ img[img < background] = 0
 img[:,:,0] = 0
 img[:,:,2] = 0
 plt.imshow(img)
+plt.title("Removed Background")
 plt.show()
 masks = []
-for i in range(1, np.max(mask)):
+centers = []
+print("Removed Background")
+for i in range(1, np.max(mask)+1):
     temp = np.copy(mask)
     temp[temp != i] = 0 
     temp[temp == i] = 1
     masks.append(temp)
-    tempImg = np.copy(img)
-    tempImg[:,:,1] *= temp
-# Start and End are manually gotten currently
-start = 25 # should loop through all
-end = 28 # gotten from the shockwaved cell
+    centers.append(getCellCenter(masks[-1]))
+print("Got Masks and Centers")
+
+# One Cell Connection Code
+
+# start = 25
+# end = 28
+# grid = np.copy(img)[:,:,1]
+# grid[grid > 0] = 1
+# StartCenterX, StartCenterY = getCellCenter(masks[start])
+# EndCenterX, EndCenterY = getCellCenter(masks[end])
+# print("Got Centers")
+# start = (StartCenterX, StartCenterY)
+# goal = (EndCenterX, EndCenterY)
+# path, isConnected = a_star_search(grid, start, goal)
+# for point in path:
+#     x = point[0]
+#     y = point[1]
+#     grid[x][y] = 255
+# print("Finished")
+# plt.imshow(grid)
+# plt.show()
+# img[:,:,0] = grid[:,:]
+# img[StartCenterX, StartCenterY, 2] = 255
+# img[EndCenterX, EndCenterY, 2] = 255
+# plt.imshow(img)
+# plt.show()
+
 grid = np.copy(img)[:,:,1]
 grid[grid > 0] = 1
-StartCenterX, StartCenterY = getCellCenter(masks[start])
-EndCenterX, EndCenterY = getCellCenter(masks[end])
-print("Got Centers")
-start = (StartCenterX, StartCenterY)
-goal = (EndCenterX, EndCenterY)
-path = a_star_search(grid, start, goal)
-for point in path:
-    x = point[0]
-    y = point[1]
-    grid[x][y] = 255
-print("Finished")
-plt.imshow(grid)
-plt.show()
-img[:,:,0] = grid[:,:]
-img[StartCenterX, StartCenterY, 2] = 255
-img[EndCenterX, EndCenterY, 2] = 255
-plt.imshow(img)
-plt.show()
+print("Created Grid")
+connectionMap = np.zeros((len(masks),len(masks)))
+shockwavedCell = 26
+print("Created Map")
+for i in range(1, len(masks)+1):
+    if i == shockwavedCell:
+        continue
+    print(f"Got Centers For Cell {i}")
+    start = centers[i]
+    goal = centers[shockwavedCell]
+    print(centers)
+    path = a_star_search(grid, start, goal)
+    print(f"Got Path For Cell {i}")
+    for point in path:
+        x = point[0]
+        y = point[1]
+        grid[x][y] = 255
+    print("Finished")
+    img[:,:,0] = grid[:,:]
+    img[start[0], start[1], 2] = 255
+    img[goal[0], goal[1], 2] = 255
+    plt.imshow(img)
+    plt.title(f"Cell {i} to Cell {shockwavedCell}")
+    plt.show()
