@@ -142,20 +142,20 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     nucWholeMask = nucWholeMask > 0
     
     img[nucWholeMask==True, 1] = 255
-    plt.imshow(img)
-    plt.title("Removed Background")
-    plt.show()
+    # plt.imshow(img)
+    # plt.title("Removed Background")
+    # plt.show()
     img = cv2.resize(img, (SIZE, SIZE))
-    plt.imshow(img)
-    plt.title("Shrunken Image")
-    plt.show()
+    # plt.imshow(img)
+    # plt.title("Shrunken Image")
+    # plt.show()
     centers = []
     print("Removed Background")
-    plt.imshow(img)
+    # plt.imshow(img)
     for outline in nucOutlines:
         centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
         plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
-    plt.show()
+    # plt.show()
     print("Got Centers")
     grid = np.copy(img)[:,:,1]
     print("Created Grid")
@@ -187,9 +187,9 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         img[:,:,0] = np.copy(grid[:,:])
         img[start[0], start[1], 2] = 255
         img[goal[0], goal[1], 2] = 255
-        plt.imshow(img)
-        plt.title(f"Cell {i} to Cell {shockwavedCell}")
-        plt.show()
+        # plt.imshow(img)
+        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        # plt.show()
     paths = np.array(paths)
     minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
