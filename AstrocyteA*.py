@@ -127,7 +127,7 @@ def a_star_search(grid, src, dest, si, di):
 # print()
 
 # Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size):
+def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size, shockwavedCell):
     SIZE = size
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
@@ -164,7 +164,6 @@ def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size):
     global connectionMap
     connectionMap = np.zeros((len(centers))) # 0 = not connected, 1 = networked, 2 = connected
     paths = []
-    shockwavedCell = 4
     connectionMap[shockwavedCell] = 3
     print("Created Map")
     for i in range(len(centers)):
@@ -201,3 +200,7 @@ def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size):
             connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(len(centers)//4) )) + 1
             print(len(paths[i]))
     return connectionMap
+
+# EXAMPLE:
+
+# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_2.tiff', '/Users/connor/Downloads/TrainingSet/models/AstroNuclei1', 576, 3)
