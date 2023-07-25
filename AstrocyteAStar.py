@@ -190,7 +190,6 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         # plt.imshow(img)
         # plt.title(f"Cell {i} to Cell {shockwavedCell}")
         # plt.show()
-    paths = np.array(paths)
     minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
     for i in range(len(centers)):
