@@ -127,7 +127,7 @@ def a_star_search(grid, src, dest, si, di):
 # print()
 
 # Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size, shockwavedCell):
+def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     SIZE = size
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
@@ -137,8 +137,6 @@ def runAStarAlgorithm(filePathNameToTiff, filePathNameToNucleiModel, size, shock
     img[:,:,0] = 0
     img[:,:,2] = 0
     
-    nucModel = models.CellposeModel(gpu=True, pretrained_model=str(filePathNameToNucleiModel))
-    nucDat = nucModel.eval(img, channels=[2,0])[0]
     nucOutlines = utils.outlines_list(nucDat)
     nucWholeMask = nucDat
     nucWholeMask = nucWholeMask > 0
