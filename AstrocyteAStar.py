@@ -131,7 +131,9 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     SIZE = size
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
-    background = int(abs(np.mean(img) - np.median(img))*3)
+    background = int(abs(np.mean(img[:,:,1]) - np.median(img[:,:,1]))*4.5)
+    print(np.mean(img[:,:,1]))
+    print(np.median(img[:,:,1]))
     print(background)
     img[img < background] = 0
     img[:,:,0] = 0
@@ -187,9 +189,9 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         img[:,:,0] = np.copy(grid[:,:])
         img[start[0], start[1], 2] = 255
         img[goal[0], goal[1], 2] = 255
-        # plt.imshow(img)
-        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
-        # plt.show()
+        plt.imshow(img)
+        plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        plt.show()
     paths = np.array(paths, dtype=object)
     minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
@@ -201,7 +203,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
 
 # EXAMPLE:
 
-# image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_2.tiff')
+# image = cv2.imread('/Users/connor/Downloads/PreTiffs/0.tiff')
 # nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei1'))
 # nucDat = nucModel.eval(image, channels=[2,0])[0]
-# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_2.tiff', nucDat, 576, 3)
+# runAStarAlgorithm('/Users/connor/Downloads/PreTiffs/0.tiff', nucDat, 576, 6)
