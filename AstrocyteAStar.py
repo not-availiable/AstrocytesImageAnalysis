@@ -131,7 +131,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     SIZE = size
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
-    background = int(abs(np.mean(img[:,:,1]) - np.median(img[:,:,1]))*4.5)
+    background = int( abs(np.mean(img[:,:,1]) - np.median(img[:,:,1])) * (abs(np.mean(img[:,:,1]) - np.min(img[:,:,1]))) // 8 )
     print(np.mean(img[:,:,1]))
     print(np.median(img[:,:,1]))
     print(background)
@@ -155,7 +155,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     print("Removed Background")
     # plt.imshow(img)
     for outline in nucOutlines:
-        centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
+        centers.append(( int(outline[:, 1].mean()) // 4, int(outline[:, 0].mean())//4 ))
         # plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
     # plt.show()
     print("Got Centers")
