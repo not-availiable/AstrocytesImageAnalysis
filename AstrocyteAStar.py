@@ -184,7 +184,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         fullDistance = math.sqrt( (abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2 )
         if (connectionMap[i] == 1):
             connectionMap[i] = int(1.25 > len(path)/fullDistance and len(path)/fullDistance > .75)
-            print(len(path))
+            # print(len(path))
         print(f"Finished Cell {i}")
         img[:,:,0] = np.copy(grid[:,:])
         img[start[0], start[1], 2] = 255
@@ -198,7 +198,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     for i in range(len(centers)):
         if (connectionMap[i] == 2):
             connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
-            print(len(paths[i]))
+            # print(len(paths[i]))
     return connectionMap
 
 # EXAMPLE:
