@@ -15,25 +15,16 @@ from multiprocessing import Pool
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
-
-def load_path(file):
-    try:
-        f = open(file)
-        path = f.readline().rstrip()
-        f.close()
-        return path
-    except Exception as e:
-        print(f"Error in load_path: {e}")
-        return None
-
+#function to get center (means)
 def get_center_location(o):
     try:
         # takes average
         return o[:, 0].mean(), o[:, 1].mean()
     except Exception as e:
+        #return error if exception has occured
         print(f"Error in get_center_location: {e}")
         return None, None
-
+#generate masks function
 def generate_masks():
     try:
         i = 0
@@ -75,17 +66,20 @@ def generate_masks():
             i += 1
     except Exception as e:
         print(f"Error in generate_masks: {e}")
-
+#saves masks in numpy array
 def save_masks(masks):
     try:
+        #save masks
         combined_mask = np.empty(())
         for mask in masks:
             combined_mask = np.dstack(combined_mask, mask)
         np.save("masks.npy",combined_mask)
     except Exception as e:
+        #prints error if exception has occured
         print(f"Error in save_masks: {e}")
 
 def sample_data(filedata):
+    #set global vars
     global first_image_sample
     global first_image_normalized_intensities
 
@@ -110,8 +104,10 @@ def sample_data(filedata):
 
         return temp, insert_index
     except Exception as e:
+        #print exception
         print(f"Error occurred while sampling data: {e}")
         return None, None
+#puts png images of graphs in directory that code is located in
 def display_data(graphData, samplingImage):
     try:
         fullMask = np.zeros(nucWholeMask.shape)
@@ -149,14 +145,17 @@ def display_data(graphData, samplingImage):
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"The function took {execution_time} seconds to run.")
-
+    #specific error will be printed out if caught
     except ValueError as ve:
+        #prints following lines if value error has occured
         print(f"ValueError: {ve}")
         print("Error occurred while plotting the data.")
     except IndexError as ie:
+        #prints following lines if dimensions of arrays are incorrect
         print(f"IndexError: {ie}")
         print("Error occurred during indexing. Check the dimensions of arrays.")
     except Exception as e:
+        #if other exception has occured, error will be printed
         print(f"Error: {e}")
         print("An unexpected error occurred.")
 def create_circular_mask(h, w, center=None, radius=None):
@@ -185,26 +184,26 @@ if __name__ == '__main__':
     # for quick running a single image
     #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
     #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
-
+    #load pre/post directory locations from config.json file
     pre_dir_path = config["pre_directory_location"]
     post_dir_path = config["post_directory_location"]
-
+    #set pre image path from directory pulled from config.json
     pre_image_paths = os.listdir(pre_dir_path)
     pre_image_paths = natsorted(pre_image_paths)
-
+    #set post image paths from directory pulled from config.json
     post_image_paths = os.listdir(post_dir_path)
     post_image_paths = natsorted(post_image_paths)
-
+    #set paths
     samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
     first_image_sample = True
     first_image_normalized_intensities = []
 
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
-
+    #load cellpose models
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
-
+    #make cellpose models run on images
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
 
@@ -250,11 +249,13 @@ if __name__ == '__main__':
     for image_path in post_image_paths:
         full_image_data.append((os.path.join(post_dir_path, image_path), i))
         i+=1
-
+    #multiprocessing (this is very finicky, be careful will modifying the multiprocessing code
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
         temp, insert_index = result
         graphData[:,insert_index] = temp
+
+    #close pool once done
     p.close()
     p.join()
     # stitch together all of the masks
