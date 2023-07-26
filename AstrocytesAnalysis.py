@@ -12,6 +12,7 @@ import json
 from natsort import natsorted
 from tqdm import tqdm
 from multiprocessing import Pool
+from skimage.transform import rescale
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
@@ -89,6 +90,8 @@ def sample_data(filedata):
         print(insert_index)
 
         samplingImage = plt.imread(filepath)
+        #downscale to 0.47 (0.7 * 0.7) for faster cellpose readability
+        samplingImage = rescale(samplingImage, 0.7)
 
         temp = []
         min_intensity = np.min(samplingImage)
@@ -110,22 +113,26 @@ def sample_data(filedata):
 #puts png images of graphs in directory that code is located in
 def display_data(graphData, samplingImage):
     try:
-        fullMask = np.zeros(nucWholeMask.shape)
+        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
         for mask in masks:
-            fullMask = np.add(fullMask, mask)
-        fullMask = fullMask > 0
+            fullMask = np.logical_or(fullMask, mask)
 
-        # Create a writable copy of the samplingImage
-        samplingImage_copy = np.copy(samplingImage)
+        #create a writable copy of the samplingImage with three channels
+        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
 
-        # for displaying the main image (subplot must be commented)
-        samplingImage_copy[~fullMask] = 0
+        # copy the green channel from the original samplingImage to the copy
+        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]  # Green channel
+
+        # apply the mask separately to each channel of the image
+        # Set masked region to 0 for red and blue channels
+        samplingImage_copy[~fullMask, 0] = 0  # Red channel
+        samplingImage_copy[~fullMask, 2] = 0  # Blue channel
+
         plt.imshow(samplingImage_copy)
 
         plt.savefig("masks", format="png")
 
         split_point = len(pre_image_paths)
-
         post_offset = list(range(split_point, split_point + len(post_image_paths)))
 
         for i in range(len(masks)):
@@ -145,19 +152,16 @@ def display_data(graphData, samplingImage):
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"The function took {execution_time} seconds to run.")
-    #specific error will be printed out if caught
     except ValueError as ve:
-        #prints following lines if value error has occured
         print(f"ValueError: {ve}")
         print("Error occurred while plotting the data.")
     except IndexError as ie:
-        #prints following lines if dimensions of arrays are incorrect
         print(f"IndexError: {ie}")
         print("Error occurred during indexing. Check the dimensions of arrays.")
     except Exception as e:
-        #if other exception has occured, error will be printed
         print(f"Error: {e}")
         print("An unexpected error occurred.")
+
 def create_circular_mask(h, w, center=None, radius=None):
     try:
         if center is None: # use the middle of the image
@@ -195,6 +199,8 @@ if __name__ == '__main__':
     post_image_paths = natsorted(post_image_paths)
     #set paths
     samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
+    samplingImage = rescale(samplingImage, 0.7)
+
     first_image_sample = True
     first_image_normalized_intensities = []
 
@@ -204,9 +210,12 @@ if __name__ == '__main__':
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
     #make cellpose models run on images
-    nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
-    cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
-
+    start2=time.time()
+    nucDat = nucModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
+    cytoDat = cytoModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
+    end2=time.time()
+    final=end2-start2
+    print(final)
     # plot image with outlines overlaid in red
     #nucOutlines = utils.outlines_list(nucDat['masks'])
     nucOutlines = utils.outlines_list(nucDat)
