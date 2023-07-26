@@ -1,5 +1,3 @@
-from audioop import mul
-import sys
 import os
 import math
 import numpy as np
@@ -12,6 +10,7 @@ import json
 from natsort import natsorted
 from tqdm import tqdm
 from multiprocessing import Pool
+import AstrocyteAStar as astar
 
 #start timer to measure how long code takes to execute
 start_time=time.time()
@@ -27,6 +26,8 @@ def get_center_location(o):
     return o[:, 0].mean(), o[:, 1].mean()
 
 def generate_masks():
+    global dead_cell
+    
     i = 0
     for o in nucOutlines:
         # nuclei
@@ -56,7 +57,7 @@ def generate_masks():
         mask = cytoWholeMask == closeMaskId
         # use original circle method if there are no valid cytoplasm masks
         if not hasCloseCytoplasm:
-            plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
+            #plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
             h, w = samplingImage.shape[:2]
             mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
         
@@ -64,6 +65,21 @@ def generate_masks():
         mask[nucWholeMask] = 0
         masks.append(mask)
         i+=1
+    
+    # fullMask = np.zeros(nucWholeMask.shape)
+    # for mask in masks:
+    #     fullMask = np.add(fullMask, mask)
+    # fullMask = fullMask > 0
+    
+    # samplingImage[~fullMask] = 0
+    plt.imshow(samplingImage)
+    plt.savefig("masks_pre", format="png")
+    post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
+    plt.imshow(post_image)
+    plt.savefig("masks_post", format="png")
+    print("please compare the two mask images that were just generated and select the dead cell")
+    dead_cell = input()
+    dead_cell = int(dead_cell)
 
 def save_masks(masks):
     combined_mask = np.empty(())
@@ -77,8 +93,6 @@ def sample_data(filedata):
     global first_image_normalized_intensities
 
     filepath, insert_index = filedata
-
-    print(insert_index)
 
     samplingImage = plt.imread(filepath)
 
@@ -95,38 +109,46 @@ def sample_data(filedata):
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
     #graphData[:,insert_index] = temp
+    print("Finished processing frame: " + str(insert_index))
     return temp, insert_index
 
 def display_data(graphData):
+    global connection_list
     graphData = np.delete(graphData, len(graphData), 1)
-    
-    fullMask = np.zeros(nucWholeMask.shape)
-    for mask in masks:
-        fullMask = np.add(fullMask, mask)
-    fullMask = fullMask > 0
-
-    # for displaying the main image (subplot must be commented)
-    samplingImage[~fullMask] = 0
-    plt.imshow(samplingImage)
-
-    plt.savefig("masks", format="png")
 
     split_point = len(pre_image_paths)
 
+    pre_offset = []
+    for i in range(0, len(pre_image_paths)):
+        pre_offset.append(i*3)
+
     post_offset = []
     for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
-        post_offset.append(i)
+        post_offset.append(i*3)
 
     for i in range(len(masks)):
         plt.clf()
         # pre graph
-        plt.plot(graphData[i][:split_point], color="blue")
+        plt.plot(pre_offset, graphData[i][:split_point], color="blue")
         # connecting line
-        x_points = np.array([split_point-1, split_point])
+        x_points = np.array([(split_point-1) * 3, split_point * 3])
         y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
         plt.plot(x_points, y_points, color="red")
         # post graph
         plt.plot(post_offset, graphData[i][split_point-1:], color="red")
+        title_text = ""
+        match connection_list[i]:
+            case 0:
+                title_text = "Not Connected"
+            case 1:
+                title_text = "Networked"
+            case 2:
+                title_text = "Connected"
+            case 3:
+                title_text = "Dead Cell"
+        plt.title(title_text)
+        plt.xlabel("time (seconds)")
+        plt.ylabel("normalized intensity")
         plt.savefig("plot" + str(i), format="png")
 
     
@@ -170,6 +192,8 @@ if __name__ == '__main__':
     samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
     first_image_sample = True
     first_image_normalized_intensities = []
+    
+    dead_cell = 0
 
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
@@ -177,7 +201,9 @@ if __name__ == '__main__':
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
+    print("Detecting Nuclei")
     nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
+    print("Detecting Cytoplasm")
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
 
     # plot image with outlines overlaid in red
@@ -199,11 +225,12 @@ if __name__ == '__main__':
     #cytoWholeMask = cytoDat['masks']
     cytoWholeMask = cytoDat
 
+    print("Generating Masks")
     generate_masks()
-    #save_masks(masks)
+
+    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, 576, dead_cell)
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
-    print(np.shape(graphData))
 
     full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
 
@@ -227,6 +254,8 @@ if __name__ == '__main__':
     for result in p.map(sample_data, full_image_data):
         temp, insert_index = result
         graphData[:,insert_index] = temp
+
+    p.close()
 
     # stitch together all of the masks
     display_data(graphData)
