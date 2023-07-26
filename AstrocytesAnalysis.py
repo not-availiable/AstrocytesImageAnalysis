@@ -1,206 +1,232 @@
-# Imports for the code
-import numpy as np
-import heapq
-import matplotlib.pyplot as plt
-import cv2
+from audioop import mul
+import sys
+import os
 import math
-from scipy import ndimage
+import numpy as np
+import numpy.ma as ma
 from cellpose import models, utils
+from matplotlib import pyplot as plt
+import multiprocessing
+import time
+import json
+from natsort import natsorted
+from tqdm import tqdm
+from multiprocessing import Pool
 
-# GLOBAL VARIABLES
+#start timer to measure how long code takes to execute
+start_time=time.time()
 
-SIZE = 576
-
-# Test of A* Algorithm using a premade array
-
-def is_valid(row, col):
-    return 0 <= row < SIZE and 0 <= col < SIZE
-
-def is_unblocked(grid, row, col):
-    return grid[row][col] == 1
-
-
-def is_destination(row, col, dest):
-    return row == dest[0] and col == dest[1]
-
-
-def calculate_h_value(row, col, dest):
-    return math.sqrt((row - dest[0]) ** 2 + (col - dest[1]) ** 2)
-
-
-def trace_path(cell_details, dest):
-    row, col = dest
-    path = []
-    while not (cell_details[row][col]['parent_i'] == row and cell_details[row][col]['parent_j'] == col):
-        path.append((row, col))
-        temp_row, temp_col = cell_details[row][col]['parent_i'], cell_details[row][col]['parent_j']
-        row, col = temp_row, temp_col
-    path.append((row, col))
+def load_path(file):
+    f = open(file)
+    path = f.readline().rstrip()
+    f.close()
     return path
 
+def get_center_location(o):
+    #takes average
+    return o[:, 0].mean(), o[:, 1].mean()
 
-def a_star_search(grid, src, dest, si, di):
-    if not is_valid(src[0], src[1]):
-        print("Source is invalid")
-        return
+def generate_masks():
+    i = 0
+    for o in nucOutlines:
+        # nuclei
+        # get average x and y
+        centerX, centerY = get_center_location(o)
+        plt.annotate(str(i), (centerX, centerY), color="white")
 
-    if not is_valid(dest[0], dest[1]):
-        print("Destination is invalid")
-        return
+        plt.plot(o[:,0], o[:,1], color='r')
 
-    if not is_unblocked(grid, src[0], src[1]) or not is_unblocked(grid, dest[0], dest[1]):
-        print("Source or the destination is blocked")
-        return
+        #get standard deviation
+        stdX = np.std(o[:,0])
+        stdY = np.std(o[:,1])
+        stdMax = max(stdX, stdY)
 
-    if is_destination(src[0], src[1], dest):
-        print("We are already at the destination")
-        return
+        # cytoplasm
+        # see if there is a cytoplasm that is close enough to a nucleus to use
+        hasCloseCytoplasm = False
+        closeMaskId = 1
+        for c in cytoOutlines: 
+            cytoCenterX, cytoCenterY = get_center_location(c)
+            if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
+                hasCloseCytoplasm = True
+                break
+            closeMaskId+=1
 
-    closed_list = [[False for _ in range(SIZE)] for _ in range(SIZE)]
-    cell_details = [
-        [{"parent_i": -1, "parent_j": -1, "f": math.inf, "g": math.inf, "h": math.inf} for _ in range(SIZE)]
-        for _ in range(SIZE)
-    ]
+        # use only the relavant part of the cytoplasm mask 
+        mask = cytoWholeMask == closeMaskId
+        # use original circle method if there are no valid cytoplasm masks
+        if not hasCloseCytoplasm:
+            plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
+            h, w = samplingImage.shape[:2]
+            mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
+        
+        # remove the nucleus from the mask
+        mask[nucWholeMask] = 0
+        masks.append(mask)
+        i+=1
 
-    i, j = src
-    cell_details[i][j]["f"] = 0.0
-    cell_details[i][j]["g"] = 0.0
-    cell_details[i][j]["h"] = 0.0
-    cell_details[i][j]["parent_i"] = i
-    cell_details[i][j]["parent_j"] = j
+def save_masks(masks):
+    combined_mask = np.empty(())
+    for mask in masks:
+        combined_mask = np.dstack(combined_mask, mask)
+    np.save("masks.npy",combined_mask)
 
-    open_list = [(0.0, (i, j))]
+def sample_data(filedata):
+    #global graphData
+    global first_image_sample
+    global first_image_normalized_intensities
 
-    while open_list:
-        f, (i, j) = heapq.heappop(open_list)
-        closed_list[i][j] = True
-        for new_i, new_j in [(i - 1, j), (i + 1, j), (i, j + 1), (i, j - 1), (i - 1, j + 1), (i - 1, j - 1),(i + 1, j + 1), (i + 1, j - 1)]:
-            if is_valid(new_i, new_j):
-                if is_destination(new_i, new_j, dest):
-                    cell_details[new_i][new_j]["parent_i"] = i
-                    cell_details[new_i][new_j]["parent_j"] = j
-                    print("The destination cell is found")
-                    connectionMap[si] = 2
-                    return trace_path(cell_details, dest)
+    filepath, insert_index = filedata
 
-                if not closed_list[new_i][new_j] and is_unblocked(grid, new_i, new_j):
-                    g_new = cell_details[i][j]["g"] + 1.0 if i == new_i or j == new_j else cell_details[i][j]["g"] + 1.414
-                    h_new = calculate_h_value(new_i, new_j, dest)
-                    f_new = g_new + h_new
-                    if cell_details[new_i][new_j]["f"] == math.inf or cell_details[new_i][new_j]["f"] > f_new:
-                        heapq.heappush(open_list, (f_new, (new_i, new_j)))
-                        cell_details[new_i][new_j]["f"] = f_new
-                        cell_details[new_i][new_j]["g"] = g_new
-                        cell_details[new_i][new_j]["h"] = h_new
-                        cell_details[new_i][new_j]["parent_i"] = i
-                        cell_details[new_i][new_j]["parent_j"] = j
+    print(insert_index)
 
-    print("Failed to find the Destination Cell")
-    # Goal is not reachable, find the nearest reachable square
-    min_distance = float('inf')
-    nearest_square = None
-    for x in range(len(grid)):
-        for y in range(len(grid[0])):
-            if closed_list[x][y]:
-                distance = calculate_h_value(x, y, dest)
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_square = (x, y)
-    connectionMap[si] = 1
-    return trace_path(cell_details, nearest_square)
+    samplingImage = plt.imread(filepath)
 
-# Example usage:
-
-# grid = [
-#     [1, 0, 1, 0, 1],
-#     [1, 1, 1, 1, 1],
-#     [1, 1, 1, 1, 0],
-#     [1, 0, 1, 0, 0],
-#     [1, 0, 1, 0, 1]
-# ]
-
-# start = (0, 0)
-# goal = (4, 4)
-# path = a_star_search(grid, start, goal)
-# for p in path:
-#     print("->", p, end=" ")
-# print()
-
-# Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
-    SIZE = size
-    image = cv2.imread(filePathNameToTiff)
-    img = np.copy(image)
-    background = int(abs(np.mean(img) - np.median(img))*3)
-    print(background)
-    img[img < background] = 0
-    img[:,:,0] = 0
-    img[:,:,2] = 0
+    temp = []
+    min_intensity = np.min(samplingImage)
+    for mask in masks:
+        intensity = np.sum(samplingImage[mask]) / np.sum(mask)
+        normalized_intensity = (intensity - min_intensity)
+        temp.append(normalized_intensity)
+        if first_image_sample:
+            first_image_normalized_intensities.append(normalized_intensity)
     
+    first_image_sample = False
+    temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
+
+    #graphData[:,insert_index] = temp
+    return temp, insert_index
+
+def display_data(graphData):
+    graphData = np.delete(graphData, len(graphData), 1)
+    
+    fullMask = np.zeros(nucWholeMask.shape)
+    for mask in masks:
+        fullMask = np.add(fullMask, mask)
+    fullMask = fullMask > 0
+
+    # for displaying the main image (subplot must be commented)
+    samplingImage[~fullMask] = 0
+    plt.imshow(samplingImage)
+
+    plt.savefig("masks", format="png")
+
+    split_point = len(pre_image_paths)
+
+    post_offset = []
+    for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
+        post_offset.append(i)
+
+    for i in range(len(masks)):
+        plt.clf()
+        # pre graph
+        plt.plot(graphData[i][:split_point], color="blue")
+        # connecting line
+        x_points = np.array([split_point-1, split_point])
+        y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
+        plt.plot(x_points, y_points, color="red")
+        # post graph
+        plt.plot(post_offset, graphData[i][split_point-1:], color="red")
+        plt.savefig("plot" + str(i), format="png")
+
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
+
+def create_circular_mask(h, w, center=None, radius=None):
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return mask
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+
+    # Load the configuration file
+    config = []
+    with open("config.json") as f:
+        config = json.load(f)
+
+    # for quick running a single image
+    #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
+    #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
+
+    pre_dir_path = config["pre_directory_location"]
+    post_dir_path = config["post_directory_location"]
+
+    pre_image_paths = os.listdir(pre_dir_path)
+    pre_image_paths = natsorted(pre_image_paths)
+
+    post_image_paths = os.listdir(post_dir_path)
+    post_image_paths = natsorted(post_image_paths)
+
+    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
+    first_image_sample = True
+    first_image_normalized_intensities = []
+
+    # for quick running a single image
+    #samplingImage = plt.imread(load_path("imgLocation.txt"))
+
+    nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
+    cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
+
+    nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
+    cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
+
+    # plot image with outlines overlaid in red
+    #nucOutlines = utils.outlines_list(nucDat['masks'])
     nucOutlines = utils.outlines_list(nucDat)
+    #cytoOutlines = utils.outlines_list(cytoDat['masks'])
+    cytoOutlines = utils.outlines_list(cytoDat)
+
+    masks = []
+
+    #masks = np.load("masks.npy")
+
+    # for quick running a single image
+    #nucWholeMask = nucDat['masks']
     nucWholeMask = nucDat
     nucWholeMask = nucWholeMask > 0
-    
-    img[nucWholeMask==True, 1] = 255
-    # plt.imshow(img)
-    # plt.title("Removed Background")
-    # plt.show()
-    img = cv2.resize(img, (SIZE, SIZE))
-    # plt.imshow(img)
-    # plt.title("Shrunken Image")
-    # plt.show()
-    centers = []
-    print("Removed Background")
-    # plt.imshow(img)
-    for outline in nucOutlines:
-        centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
-        # plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
-    # plt.show()
-    print("Got Centers")
-    grid = np.copy(img)[:,:,1]
-    print("Created Grid")
-    global connectionMap
-    connectionMap = np.zeros((len(centers))) # 0 = not connected, 1 = networked, 2 = connected
-    paths = []
-    connectionMap[shockwavedCell] = 3
-    print("Created Map")
-    for i in range(len(centers)):
-        if i == shockwavedCell:
-            paths.append([0])
-            continue
-        grid[grid > 0] = 1
-        start = centers[i]
-        goal = centers[shockwavedCell]
-        print(f"Got Centers For Cell {i}")
-        path = a_star_search(grid, start, goal, i, shockwavedCell)
-        paths.append(path)
-        print(f"Got Path For Cell {i}")
-        for point in path:
-            x = point[0]
-            y = point[1]
-            grid[x][y] = 255
-        fullDistance = math.sqrt( (abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2 )
-        if (connectionMap[i] == 1):
-            connectionMap[i] = int(1.25 > len(path)/fullDistance and len(path)/fullDistance > .75)
-            print(len(path))
-        print(f"Finished Cell {i}")
-        img[:,:,0] = np.copy(grid[:,:])
-        img[start[0], start[1], 2] = 255
-        img[goal[0], goal[1], 2] = 255
-        # plt.imshow(img)
-        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
-        # plt.show()
-    paths = np.array(paths)
-    minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
-    maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
-    for i in range(len(centers)):
-        if (connectionMap[i] == 2):
-            connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
-            print(len(paths[i]))
-    return connectionMap
 
-# EXAMPLE:
-image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_2.tiff')
-nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei1'))
-nucDat = nucModel.eval(image, channels=[2,0])[0]
-runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_2.tiff', nucDat, 576, 3)
+    # for quick running a single image
+    #cytoWholeMask = cytoDat['masks']
+    cytoWholeMask = cytoDat
+
+    generate_masks()
+    #save_masks(masks)
+
+    graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
+    print(np.shape(graphData))
+
+    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
+
+    temp = []
+    insert_index = 0
+
+    temp, insert_index = sample_data(full_image_data[0])
+    graphData[:,insert_index] = temp
+
+    i = 0
+    for image_path in pre_image_paths:
+        if i > 0:
+            full_image_data.append((os.path.join(pre_dir_path, image_path), i))
+        i+=1
+
+    for image_path in post_image_paths:
+        full_image_data.append((os.path.join(post_dir_path, image_path), i))
+        i+=1
+
+    p = Pool(16)
+    for result in p.map(sample_data, full_image_data):
+        temp, insert_index = result
+        graphData[:,insert_index] = temp
+
+    # stitch together all of the masks
+    display_data(graphData)

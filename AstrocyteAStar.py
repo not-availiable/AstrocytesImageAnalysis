@@ -154,7 +154,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
     # plt.imshow(img)
     for outline in nucOutlines:
         centers.append(( int(outline[:, 1].mean())//4, int(outline[:, 0].mean())//4 ))
-        plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
+        # plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
     # plt.show()
     print("Got Centers")
     grid = np.copy(img)[:,:,1]
@@ -190,6 +190,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         # plt.imshow(img)
         # plt.title(f"Cell {i} to Cell {shockwavedCell}")
         # plt.show()
+    paths = np.array(paths)
     minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
     for i in range(len(centers)):
@@ -200,4 +201,7 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
 
 # EXAMPLE:
 
-# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_2.tiff', '/Users/connor/Downloads/TrainingSet/models/AstroNuclei1', 576, 3)
+# image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_2.tiff')
+# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei1'))
+# nucDat = nucModel.eval(image, channels=[2,0])[0]
+# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_2.tiff', nucDat, 576, 3)
