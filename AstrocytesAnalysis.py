@@ -94,8 +94,6 @@ def sample_data(filedata):
 
     filepath, insert_index = filedata
 
-    print(insert_index)
-
     samplingImage = plt.imread(filepath)
 
     temp = []
@@ -111,6 +109,7 @@ def sample_data(filedata):
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
     #graphData[:,insert_index] = temp
+    print("Finished processing frame: " + str(insert_index))
     return temp, insert_index
 
 def display_data(graphData):
@@ -119,16 +118,20 @@ def display_data(graphData):
 
     split_point = len(pre_image_paths)
 
+    pre_offset = []
+    for i in range(0, len(pre_image_paths)):
+        pre_offset.append(i*3)
+
     post_offset = []
     for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
-        post_offset.append(i)
+        post_offset.append(i*3)
 
     for i in range(len(masks)):
         plt.clf()
         # pre graph
-        plt.plot(graphData[i][:split_point], color="blue")
+        plt.plot(pre_offset, graphData[i][:split_point], color="blue")
         # connecting line
-        x_points = np.array([split_point-1, split_point])
+        x_points = np.array([(split_point-1) * 3, split_point * 3])
         y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
         plt.plot(x_points, y_points, color="red")
         # post graph
@@ -144,6 +147,8 @@ def display_data(graphData):
             case 3:
                 title_text = "Dead Cell"
         plt.title(title_text)
+        plt.xlabel("time (seconds)")
+        plt.ylabel("normalized intensity")
         plt.savefig("plot" + str(i), format="png")
 
     
@@ -226,7 +231,6 @@ if __name__ == '__main__':
     connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, 576, dead_cell)
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
-    print(np.shape(graphData))
 
     full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
 
@@ -250,6 +254,8 @@ if __name__ == '__main__':
     for result in p.map(sample_data, full_image_data):
         temp, insert_index = result
         graphData[:,insert_index] = temp
+
+    p.close()
 
     # stitch together all of the masks
     display_data(graphData)
