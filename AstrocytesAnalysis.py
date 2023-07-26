@@ -13,139 +13,167 @@ from natsort import natsorted
 from tqdm import tqdm
 from multiprocessing import Pool
 
-#start timer to measure how long code takes to execute
-start_time=time.time()
+# start timer to measure how long code takes to execute
+start_time = time.time()
 
 def load_path(file):
-    f = open(file)
-    path = f.readline().rstrip()
-    f.close()
-    return path
+    try:
+        f = open(file)
+        path = f.readline().rstrip()
+        f.close()
+        return path
+    except Exception as e:
+        print(f"Error in load_path: {e}")
+        return None
 
 def get_center_location(o):
-    #takes average
-    return o[:, 0].mean(), o[:, 1].mean()
+    try:
+        # takes average
+        return o[:, 0].mean(), o[:, 1].mean()
+    except Exception as e:
+        print(f"Error in get_center_location: {e}")
+        return None, None
 
 def generate_masks():
-    i = 0
-    for o in nucOutlines:
-        # nuclei
-        # get average x and y
-        centerX, centerY = get_center_location(o)
-        plt.annotate(str(i), (centerX, centerY), color="white")
+    try:
+        i = 0
+        for o in nucOutlines:
+            # nuclei
+            # get average x and y
+            centerX, centerY = get_center_location(o)
+            plt.annotate(str(i), (centerX, centerY), color="white")
 
-        plt.plot(o[:,0], o[:,1], color='r')
+            plt.plot(o[:,0], o[:,1], color='r')
 
-        #get standard deviation
-        stdX = np.std(o[:,0])
-        stdY = np.std(o[:,1])
-        stdMax = max(stdX, stdY)
+            # get standard deviation
+            stdX = np.std(o[:,0])
+            stdY = np.std(o[:,1])
+            stdMax = max(stdX, stdY)
 
-        # cytoplasm
-        # see if there is a cytoplasm that is close enough to a nucleus to use
-        hasCloseCytoplasm = False
-        closeMaskId = 1
-        for c in cytoOutlines: 
-            cytoCenterX, cytoCenterY = get_center_location(c)
-            if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
-                hasCloseCytoplasm = True
-                break
-            closeMaskId+=1
+            # cytoplasm
+            # see if there is a cytoplasm that is close enough to a nucleus to use
+            hasCloseCytoplasm = False
+            closeMaskId = 1
+            for c in cytoOutlines: 
+                cytoCenterX, cytoCenterY = get_center_location(c)
+                if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
+                    hasCloseCytoplasm = True
+                    break
+                closeMaskId+=1
 
-        # use only the relavant part of the cytoplasm mask 
-        mask = cytoWholeMask == closeMaskId
-        # use original circle method if there are no valid cytoplasm masks
-        if not hasCloseCytoplasm:
-            plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
-            h, w = samplingImage.shape[:2]
-            mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
-        
-        # remove the nucleus from the mask
-        mask[nucWholeMask] = 0
-        masks.append(mask)
-        i+=1
+            # use only the relevant part of the cytoplasm mask 
+            mask = cytoWholeMask == closeMaskId
+            # use original circle method if there are no valid cytoplasm masks
+            if not hasCloseCytoplasm:
+                plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
+                h, w = samplingImage.shape[:2]
+                mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
+            
+            # remove the nucleus from the mask
+            mask[nucWholeMask] = 0
+            masks.append(mask)
+            i += 1
+    except Exception as e:
+        print(f"Error in generate_masks: {e}")
 
 def save_masks(masks):
-    combined_mask = np.empty(())
-    for mask in masks:
-        combined_mask = np.dstack(combined_mask, mask)
-    np.save("masks.npy",combined_mask)
+    try:
+        combined_mask = np.empty(())
+        for mask in masks:
+            combined_mask = np.dstack(combined_mask, mask)
+        np.save("masks.npy",combined_mask)
+    except Exception as e:
+        print(f"Error in save_masks: {e}")
 
 def sample_data(filedata):
-    #global graphData
     global first_image_sample
     global first_image_normalized_intensities
 
-    filepath, insert_index = filedata
+    try:
+        filepath, insert_index = filedata
 
-    print(insert_index)
+        print(insert_index)
 
-    samplingImage = plt.imread(filepath)
+        samplingImage = plt.imread(filepath)
 
-    temp = []
-    min_intensity = np.min(samplingImage)
-    for mask in masks:
-        intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-        normalized_intensity = (intensity - min_intensity)
-        temp.append(normalized_intensity)
-        if first_image_sample:
-            first_image_normalized_intensities.append(normalized_intensity)
-    
-    first_image_sample = False
-    temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
+        temp = []
+        min_intensity = np.min(samplingImage)
+        for mask in masks:
+            intensity = np.sum(samplingImage[mask]) / np.sum(mask)
+            normalized_intensity = (intensity - min_intensity)
+            temp.append(normalized_intensity)
+            if first_image_sample:
+                first_image_normalized_intensities.append(normalized_intensity)
+        
+        first_image_sample = False
+        temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
-    #graphData[:,insert_index] = temp
-    return temp, insert_index
+        return temp, insert_index
+    except Exception as e:
+        print(f"Error occurred while sampling data: {e}")
+        return None, None
+def display_data(graphData, samplingImage):
+    try:
+        fullMask = np.zeros(nucWholeMask.shape)
+        for mask in masks:
+            fullMask = np.add(fullMask, mask)
+        fullMask = fullMask > 0
 
-def display_data(graphData):
-    graphData = np.delete(graphData, len(graphData), 1)
-    
-    fullMask = np.zeros(nucWholeMask.shape)
-    for mask in masks:
-        fullMask = np.add(fullMask, mask)
-    fullMask = fullMask > 0
+        # Create a writable copy of the samplingImage
+        samplingImage_copy = np.copy(samplingImage)
 
-    # for displaying the main image (subplot must be commented)
-    samplingImage[~fullMask] = 0
-    plt.imshow(samplingImage)
+        # for displaying the main image (subplot must be commented)
+        samplingImage_copy[~fullMask] = 0
+        plt.imshow(samplingImage_copy)
 
-    plt.savefig("masks", format="png")
+        plt.savefig("masks", format="png")
 
-    split_point = len(pre_image_paths)
+        split_point = len(pre_image_paths)
 
-    post_offset = []
-    for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
-        post_offset.append(i)
+        post_offset = list(range(split_point, split_point + len(post_image_paths)))
 
-    for i in range(len(masks)):
-        plt.clf()
-        # pre graph
-        plt.plot(graphData[i][:split_point], color="blue")
-        # connecting line
-        x_points = np.array([split_point-1, split_point])
-        y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-        plt.plot(x_points, y_points, color="red")
-        # post graph
-        plt.plot(post_offset, graphData[i][split_point-1:], color="red")
-        plt.savefig("plot" + str(i), format="png")
+        for i in range(len(masks)):
+            plt.clf()
+            # pre graph
+            plt.plot(graphData[i][:split_point], color="blue")
+            # connecting line
+            x_points = np.array([split_point-1, split_point])
+            y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
+            plt.plot(x_points, y_points, color="red")
+            
+            # Make sure the lengths of post_offset and graphData[i][split_point-1:] are the same
+            num_points = min(len(post_offset), len(graphData[i][split_point-1:]))
+            plt.plot(post_offset[:num_points], graphData[i][split_point-1:][:num_points], color="red")
+            plt.savefig("plot" + str(i), format="png")
 
-    
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(f"The function took {execution_time} seconds to run.")
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"The function took {execution_time} seconds to run.")
 
+    except ValueError as ve:
+        print(f"ValueError: {ve}")
+        print("Error occurred while plotting the data.")
+    except IndexError as ie:
+        print(f"IndexError: {ie}")
+        print("Error occurred during indexing. Check the dimensions of arrays.")
+    except Exception as e:
+        print(f"Error: {e}")
+        print("An unexpected error occurred.")
 def create_circular_mask(h, w, center=None, radius=None):
-    if center is None: # use the middle of the image
-        center = (int(w/2), int(h/2))
-    if radius is None: # use the smallest distance between the center and image walls
-        radius = min(center[0], center[1], w-center[0], h-center[1])
+    try:
+        if center is None: # use the middle of the image
+            center = (int(w/2), int(h/2))
+        if radius is None: # use the smallest distance between the center and image walls
+            radius = min(center[0], center[1], w-center[0], h-center[1])
 
-    Y, X = np.ogrid[:h, :w]
-    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
-    mask = dist_from_center <= radius
-    return mask
-
+        mask = dist_from_center <= radius
+        return mask
+    except Exception as e:
+        print(f"Error in create_circular_mask: {e}")
+        return None
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
@@ -227,6 +255,7 @@ if __name__ == '__main__':
     for result in p.map(sample_data, full_image_data):
         temp, insert_index = result
         graphData[:,insert_index] = temp
-
+    p.close()
+    p.join()
     # stitch together all of the masks
-    display_data(graphData)
+    display_data(graphData, samplingImage)
