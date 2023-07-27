@@ -127,8 +127,7 @@ def a_star_search(grid, src, dest, si, di):
 # print()
 
 # Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell, closeCellcount):
-    SIZE = size
+def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount):
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
     img[(img - np.mean(img)) / np.std(img) < 1.21] = 0
@@ -206,4 +205,4 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell, closeCel
 # image = cv2.imread('/home/bob/Downloads/PreTiffs/0.tiff')
 # nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/home/bob/Downloads/TrainingSet/models/AstroNuclei2'))
 # nucDat = nucModel.eval(image, channels=[2,0])[0]
-# runAStarAlgorithm('/home/bob/Downloads/PreTiffs/0.tiff', nucDat, 576, 6)
+# runAStarAlgorithm('/home/bob/Downloads/PreTiffs/0.tiff', nucDat, 6)
