@@ -27,6 +27,7 @@ def get_center_location(o):
 
 def generate_masks():
     global dead_cell
+    global close_cell_count
     
     i = 0
     for o in nucOutlines:
@@ -77,9 +78,12 @@ def generate_masks():
     post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
     plt.imshow(post_image)
     plt.savefig("masks_post", format="png")
-    print("please compare the two mask images that were just generated and select the dead cell")
+    print("please open and compare the two mask images that were just generated in the folder and type the number of the dead cell")
     dead_cell = input()
     dead_cell = int(dead_cell)
+    print("please type the number of cells that are close to the dead cell")
+    close_cell_count = input()
+    close_cell_count = int(close_cell_count)
 
 def save_masks(masks):
     combined_mask = np.empty(())
@@ -123,7 +127,7 @@ def display_data(graphData):
         pre_offset.append(i*3)
 
     post_offset = []
-    for i in range(len(pre_image_paths), len(pre_image_paths) + len(post_image_paths)):
+    for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
         post_offset.append(i*3)
 
     for i in range(len(masks)):
@@ -131,9 +135,9 @@ def display_data(graphData):
         # pre graph
         plt.plot(pre_offset, graphData[i][:split_point], color="blue")
         # connecting line
-        x_points = np.array([(split_point-1) * 3, split_point * 3])
-        y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-        plt.plot(x_points, y_points, color="red")
+        # x_points = np.array([(split_point-1) * 3, split_point * 3])
+        # y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
+        # plt.plot(x_points, y_points, color="green")
         # post graph
         plt.plot(post_offset, graphData[i][split_point-1:], color="red")
         title_text = ""
@@ -194,6 +198,7 @@ if __name__ == '__main__':
     first_image_normalized_intensities = []
     
     dead_cell = 0
+    close_cell_count = 0
 
     # for quick running a single image
     #samplingImage = plt.imread(load_path("imgLocation.txt"))
@@ -228,7 +233,7 @@ if __name__ == '__main__':
     print("Generating Masks")
     generate_masks()
 
-    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, 576, dead_cell)
+    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, 576, dead_cell, close_cell_count)
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 

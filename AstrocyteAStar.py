@@ -127,15 +127,11 @@ def a_star_search(grid, src, dest, si, di):
 # print()
 
 # Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
+def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell, closeCellcount):
     SIZE = size
     image = cv2.imread(filePathNameToTiff)
     img = np.copy(image)
-    background = int( abs(np.mean(img[:,:,1]) - np.median(img[:,:,1])) * (abs(np.mean(img[:,:,1]) - np.min(img[:,:,1]))) // 8 )
-    print(np.mean(img[:,:,1]))
-    print(np.median(img[:,:,1]))
-    print(background)
-    img[img < background] = 0
+    img[(img - np.mean(img)) / np.std(img) < 1.21] = 0
     img[:,:,0] = 0
     img[:,:,2] = 0
     
@@ -189,21 +185,25 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, size, shockwavedCell):
         img[:,:,0] = np.copy(grid[:,:])
         img[start[0], start[1], 2] = 255
         img[goal[0], goal[1], 2] = 255
-        # plt.imshow(img)
-        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
-        # plt.show()
+        # # plt.imshow(img)
+        # # plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        # # plt.show()
     paths = np.array(paths, dtype=object)
-    minDistance = min(len(arr) for arr in paths[np.where(connectionMap == 2)])
+    distArr = []
+    for arr in paths[np.where(connectionMap == 2)]:
+        distArr.append(len(arr))
+    distArr = np.sort(distArr)
+    minDistance = distArr[closeCellcount + 1]
     maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
     for i in range(len(centers)):
         if (connectionMap[i] == 2):
             connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
-            # print(len(paths[i]))
+            print(len(paths[i]))
     return connectionMap
 
 # EXAMPLE:
 
-# image = cv2.imread('/Users/connor/Downloads/PreTiffs/0.tiff')
-# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei1'))
+# image = cv2.imread('/home/bob/Downloads/PreTiffs/0.tiff')
+# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/home/bob/Downloads/TrainingSet/models/AstroNuclei2'))
 # nucDat = nucModel.eval(image, channels=[2,0])[0]
-# runAStarAlgorithm('/Users/connor/Downloads/PreTiffs/0.tiff', nucDat, 576, 6)
+# runAStarAlgorithm('/home/bob/Downloads/PreTiffs/0.tiff', nucDat, 576, 6)
