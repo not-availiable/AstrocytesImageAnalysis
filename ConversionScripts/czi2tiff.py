@@ -1,4 +1,5 @@
 import tifffile as tf
+from aicsimageio import AICSImage
 import numpy as np
 import cv2
 import os
@@ -25,6 +26,10 @@ os.makedirs(intendedTraining_dir, exist_ok=True)
 czi2tif(input_czi)
 
 print("Conversion successful, starting tif to tiff conversion", flush=True)
+
+img = AICSImage(input_czi + ".tif")
+
+print(img.channel_names)
 
 # Read the TIF file
 with tf.TiffFile(input_czi + ".tif") as tif:
