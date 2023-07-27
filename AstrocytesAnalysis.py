@@ -48,6 +48,8 @@ def generate_masks():
         hasCloseCytoplasm = False
         closeMaskId = 1
         for c in cytoOutlines: 
+            if i == 0:
+                plt.plot(c[:,0], c[:,1], color='r') 
             cytoCenterX, cytoCenterY = get_center_location(c)
             if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
                 hasCloseCytoplasm = True
@@ -102,6 +104,7 @@ def sample_data(filedata):
 
     temp = []
     min_intensity = np.min(samplingImage)
+    print("Minimum Intensity: " + str(min_intensity))
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
         normalized_intensity = (intensity - min_intensity)
