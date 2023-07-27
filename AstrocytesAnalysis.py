@@ -11,6 +11,7 @@ from natsort import natsorted
 from tqdm import tqdm
 from multiprocessing import Pool
 import AstrocyteAStar as astar
+import FullAnalysis as anal
 
 #start timer to measure how long code takes to execute
 start_time=time.time()
@@ -157,6 +158,7 @@ def display_data(graphData):
         plt.xlabel("time (seconds)")
         plt.ylabel("normalized intensity")
         plt.savefig("plot" + str(i), format="png")
+    return pre_offset, post_offset
 
     
     end_time = time.time()
@@ -236,7 +238,7 @@ if __name__ == '__main__':
     print("Generating Masks")
     generate_masks()
 
-    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, 576, dead_cell, close_cell_count)
+    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, dead_cell, close_cell_count)
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
@@ -266,4 +268,6 @@ if __name__ == '__main__':
     p.close()
 
     # stitch together all of the masks
-    display_data(graphData)
+    pre, post = display_data(graphData)
+
+    anal.getStats(nucDat, len(masks), pre + post, graphData, dead_cell)
