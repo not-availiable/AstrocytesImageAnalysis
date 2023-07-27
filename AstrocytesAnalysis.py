@@ -282,9 +282,10 @@ if __name__ == '__main__':
     pre_image_paths = natsorted(pre_image_paths)
     post_image_paths = os.listdir(post_dir_path)
     post_image_paths = natsorted(post_image_paths)
+    
+    # read the last pre image
+    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[-1]))
 
-    # read the first pre image
-    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
     # downscale the image for faster cellpose readability
     samplingImage = rescale(samplingImage, 0.8, anti_aliasing=True)
 
@@ -329,8 +330,9 @@ if __name__ == '__main__':
     rawData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
     print(np.shape(graphData))
 
-    # initialize the full image data array with the first pre image
-    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
+    # initialize the full image data array with the last pre image
+    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[-1]), 0)]
+
     # sample the data from the first pre image
     temp, insert_index, temp_raw = sample_data(full_image_data[0])
     # add the data to the graph data and raw data arrays
