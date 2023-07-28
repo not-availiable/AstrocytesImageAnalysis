@@ -99,29 +99,42 @@ def sample_data(filedata):
     global first_image_sample
     global first_image_normalized_intensities
 
+    min_intensity = 1
+    max_intensity = 1
+
     filepath, insert_index = filedata
 
     samplingImage = plt.imread(filepath)
 
     temp = []
-    min_intensity = np.min(samplingImage)
-    print("Minimum Intensity: " + str(min_intensity))
+    # min_intensity = np.min(samplingImage)
+    bg_intensity = np.mean(samplingImage[np.where((samplingImage - np.mean(samplingImage)) / np.std(samplingImage) < 1.21)])
+
     for mask in masks:
         intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-        normalized_intensity = (intensity - min_intensity)
+        normalized_intensity = (intensity - bg_intensity)
         temp.append(normalized_intensity)
         if first_image_sample:
             first_image_normalized_intensities.append(normalized_intensity)
     
-    first_image_sample = False
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
-    #graphData[:,insert_index] = temp
+    for value in temp:
+        if value < min_intensity:
+            min_intensity = value
+        if value > max_intensity:
+            max_intensity = value
+    
+
     print("Finished processing frame: " + str(insert_index))
-    return temp, insert_index
+    first_image_sample = False
+    return temp, insert_index, min_intensity, max_intensity
 
 def display_data(graphData):
     global connection_list
+    global min_intensity
+    global max_intensity
+
     graphData = np.delete(graphData, len(graphData), 1)
 
     split_point = len(pre_image_paths)
@@ -155,15 +168,11 @@ def display_data(graphData):
             case 3:
                 title_text = "Dead Cell"
         plt.title(title_text)
+        plt.ylim(min_intensity, max_intensity)
         plt.xlabel("time (seconds)")
         plt.ylabel("normalized intensity")
         plt.savefig("plot" + str(i), format="png")
     return pre_offset, post_offset
-
-    
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(f"The function took {execution_time} seconds to run.")
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -193,14 +202,32 @@ if __name__ == '__main__':
     post_dir_path = config["post_directory_location"]
 
     pre_image_paths = os.listdir(pre_dir_path)
+    validPaths = []
+    for i, path in enumerate(pre_image_paths):
+        if not path.startswith("."):
+            validPaths.append(pre_image_paths[i])
+    print(validPaths)
+    pre_image_paths = validPaths
     pre_image_paths = natsorted(pre_image_paths)
 
     post_image_paths = os.listdir(post_dir_path)
+    validPaths = []
+    for i, path in enumerate(post_image_paths):
+        if not path.startswith("."):
+            validPaths.append(post_image_paths[i])
+    post_image_paths = validPaths
     post_image_paths = natsorted(post_image_paths)
 
-    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[0]))
+    #print(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
+
+    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
     first_image_sample = True
     first_image_normalized_intensities = []
+
+    min_intensity = 1
+    max_intensity = 1
+    min_intensities = []
+    max_intensities = []
     
     dead_cell = 0
     close_cell_count = 0
@@ -238,21 +265,23 @@ if __name__ == '__main__':
     print("Generating Masks")
     generate_masks()
 
-    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[0]), nucDat, dead_cell, close_cell_count)
+    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]), nucDat, dead_cell, close_cell_count)
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
-    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[0]), 0)]
+    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]), len(pre_image_paths)-1)]
 
     temp = []
-    insert_index = 0
+    insert_index = len(pre_image_paths) - 1
 
-    temp, insert_index = sample_data(full_image_data[0])
+    temp, insert_index, min_intensity, max_intensity = sample_data(full_image_data[0])
+    min_intensities.append(min_intensity)
+    max_intensities.append(max_intensity)
     graphData[:,insert_index] = temp
 
     i = 0
     for image_path in pre_image_paths:
-        if i > 0:
+        if i != insert_index:
             full_image_data.append((os.path.join(pre_dir_path, image_path), i))
         i+=1
 
@@ -262,12 +291,20 @@ if __name__ == '__main__':
 
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
-        temp, insert_index = result
+        temp, insert_index, min_intensity, max_intensity = result
+        min_intensities.append(min_intensity)
+        max_intensities.append(max_intensity)
         graphData[:,insert_index] = temp
-
     p.close()
+
+    min_intensity = np.min(min_intensities)
+    max_intensity = np.max(max_intensities)
 
     # stitch together all of the masks
     pre, post = display_data(graphData)
 
     anal.getStats(nucDat, len(masks), pre + post, graphData, dead_cell)
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
