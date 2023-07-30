@@ -7,6 +7,8 @@ import math
 # GLOBAL VARIABLES
 
 CONNECTION_DICT = {0:"Not Connected", 1:"Networked", 2:"Connected", 3:"Dead Cell"}
+stats = {}
+centers = []
 
 # Methods to make csv
 def create_dataframe(rois):
