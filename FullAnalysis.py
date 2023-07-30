@@ -10,7 +10,7 @@ CONNECTION_DICT = {0:"Not Connected", 1:"Networked", 2:"Connected", 3:"Dead Cell
 stats = {}
 centers = []
 
-# Methods to make csv
+# Methods to make CSV
 def create_dataframe(rois):
     global stats
     stats = {
