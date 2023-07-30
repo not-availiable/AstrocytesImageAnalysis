@@ -139,20 +139,20 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount
     nucWholeMask = nucWholeMask > 0
     
     img[nucWholeMask==True, 1] = image[nucWholeMask==True, 1]
-    plt.imshow(img)
-    plt.title("Removed Background")
-    plt.show()
+    # plt.imshow(img)
+    # plt.title("Removed Background")
+    # plt.show()
     img = cv2.resize(img, (SIZE, SIZE))
-    plt.imshow(img)
-    plt.title("Shrunken Image")
-    plt.show()
+    # plt.imshow(img)
+    # plt.title("Shrunken Image")
+    # plt.show()
     centers = []
     print("Removed Background")
-    plt.imshow(img)
+    # plt.imshow(img)
     for outline in nucOutlines:
         centers.append(( int(outline[:, 1].mean()) // 4, int(outline[:, 0].mean())//4 ))
-        plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
-    plt.show()
+    #     plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
+    # plt.show()
     print("Got Centers")
     grid = np.copy(img)[:,:,1]
     print("Created Grid")
@@ -184,9 +184,9 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount
         img[:,:,0] = np.copy(grid[:,:])
         img[start[0], start[1], 2] = 255
         img[goal[0], goal[1], 2] = 255
-        plt.imshow(img)
-        plt.title(f"Cell {i} to Cell {shockwavedCell}")
-        plt.show()
+        # plt.imshow(img)
+        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        # plt.show()
     paths = np.array(paths, dtype=object)
     distArr = []
     for arr in paths[np.where(connectionMap == 2)]:
@@ -197,12 +197,12 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount
     for i in range(len(centers)):
         if (connectionMap[i] == 2):
             connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
-            print(len(paths[i]))
+            # print(len(paths[i]))
     return connectionMap
 
 # EXAMPLE:
 
-image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_0.tiff')
-nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei2'))
-nucDat = nucModel.eval(image, channels=[2,0])[0]
-runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_0.tiff', nucDat, 6, 6)
+# image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_0.tiff')
+# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei2'))
+# nucDat = nucModel.eval(image, channels=[2,0])[0]
+# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_0.tiff', nucDat, 6, 6)
