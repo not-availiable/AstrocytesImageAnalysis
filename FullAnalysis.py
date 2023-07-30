@@ -32,20 +32,23 @@ def create_csv():
 
 # Line intersection for FWHM
 def FWHM(x, y, roi):
-    # Find the maximum y-value and its index
-    max_y = np.max(y)
-    max_idx = np.argmax(y)
-    # Calculate the half maximum value
-    half_max = max_y / 2
-    # Find the index of the nearest values to the left and right of the half maximum
-    try:
-        left_idx = np.argmin(np.abs(y[:max_idx] - half_max))
-    except:
+    # Get half the max of y
+    half_max = max(y) / 2.0
+    # Find the left and right indices where the peak crosses half_max
+    left_idx = None
+    right_idx = None
+    for idx in range(1, len(y)):
+        if y[idx - 1] <= half_max < y[idx]:
+            left_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
+        if y[idx - 1] >= half_max > y[idx]:
+            right_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
+        if left_idx is not None and right_idx is not None:
+            break
+    # Incase there is no intersection, set to max/min of the x
+    if (left_idx is None):
         left_idx = 0
-    try:
-        right_idx = max_idx + np.argmin(np.abs(y[max_idx:] - half_max))
-    except:
-        right_idx = 0
+    if (right_idx is None):
+        right_idx = x[-1]
     # Calculate the FWHM
     fwhm = x[right_idx] - x[left_idx]
     # Write to the data
