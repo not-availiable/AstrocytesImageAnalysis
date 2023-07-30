@@ -60,7 +60,7 @@ def FWHM(x, y, roi):
     if (right_idx is None):
         right_idx = x[-1]
     # Calculate the FWHM
-    fwhm = (x[int(right_idx)] + math.abs(x[int(right_idx)] - x[math.ceil(right_idx)]) * (right_idx % 1)) - (x[int(left_idx)] + math.abs(x[int(left_idx)] - x[math.ceil(left_idx)]) * (left_idx % 1))
+    fwhm = (x[int(right_idx)] + abs(x[int(right_idx)] - x[math.ceil(right_idx)]) * (right_idx % 1)) - (x[int(left_idx)] + abs(x[int(left_idx)] - x[math.ceil(left_idx)]) * (left_idx % 1))
     # Write to the data
     stats['FWHM'][roi] = fwhm
     stats['FWHM_Left_Index'][roi] = left_idx
