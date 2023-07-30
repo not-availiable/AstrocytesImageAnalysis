@@ -95,7 +95,8 @@ def a_star_search(grid, src, dest, si, di):
                         cell_details[new_i][new_j]["parent_i"] = i
                         cell_details[new_i][new_j]["parent_j"] = j
 
-    print("Failed to find the Destination Cell")
+    print("Failed to find a direct connection")
+    print("Finding closest connection")
     # Goal is not reachable, find the nearest reachable square
     min_distance = float('inf')
     nearest_square = None
