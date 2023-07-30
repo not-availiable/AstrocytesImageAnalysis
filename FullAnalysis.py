@@ -38,11 +38,16 @@ def FWHM(x, y, roi):
     # Calculate the half maximum value
     half_max = max_y / 2
     # Find the index of the nearest values to the left and right of the half maximum
-    left_idx = np.argmin(np.abs(y[:max_idx] - half_max))
-    right_idx = max_idx + np.argmin(np.abs(y[max_idx:] - half_max))
+    try:
+        left_idx = np.argmin(np.abs(y[:max_idx] - half_max))
+    except:
+        left_idx = 0
+    try:
+        right_idx = max_idx + np.argmin(np.abs(y[max_idx:] - half_max))
+    except:
+        right_idx = 0
     # Calculate the FWHM
     fwhm = x[right_idx] - x[left_idx]
-    print(fwhm)
     # Write to the data
     stats['FWHM'][roi] = fwhm
     stats['FWHM_Left_Index'][roi] = left_idx
