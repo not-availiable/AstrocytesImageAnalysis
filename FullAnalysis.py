@@ -20,7 +20,7 @@ def create_dataframe(rois):
         'FWHM_Right_Index': np.zeros(rois),
         'Connection': np.zeros(rois),
         'Distance': np.zeros(rois),
-        'Integral': np.zeros(rois),
+        'Integral': np.zeros(rois)
     }
 
 # Code to create the csv from the data
