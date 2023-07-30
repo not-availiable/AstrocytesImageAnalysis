@@ -30,31 +30,46 @@ def create_csv():
     statsdf = pd.DataFrame(stats)
     statsdf.to_csv('AstrocyteStats.csv', index = False)
 
+def lerp(start, end, t):
+    return start * (1 - t) + end * t
+
 # Line intersection for FWHM
+def yatx(x, y):
+    y_lower = y[math.floor(x)]
+    y_upper = y[math.ceil(x)]
+    decimal = x % 1
+    return lerp(y_lower, y_upper, decimal)
+    
+
 def FWHM(x, y, roi):
-    # Get half the max of y
-    half_max = max(y) / 2.0
-    # Find the left and right indices where the peak crosses half_max
-    left_idx = None
-    right_idx = None
-    for idx in range(1, len(y)):
-        if y[idx - 1] <= half_max < y[idx]:
-            left_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
-        if y[idx - 1] >= half_max > y[idx]:
-            right_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
-        if left_idx is not None and right_idx is not None:
-            break
-    # Incase there is no intersection, set to max/min of the x
-    if (left_idx is None):
-        left_idx = 0
-    if (right_idx is None):
-        right_idx = x[-1]
-    # Calculate the FWHM
-    fwhm = (x[int(right_idx)] + math.abs(x[int(right_idx)] - x[math.ceil(right_idx)]) * (right_idx % 1)) - (x[int(left_idx)] + math.abs(x[int(left_idx)] - x[math.ceil(left_idx)]) * (left_idx % 1))
-    # Write to the data
-    stats['FWHM'][roi] = fwhm
-    stats['FWHM_Left_Index'][roi] = left_idx
-    stats['FWHM_Right_Index'][roi] = right_idx
+    # Find the maximum y-value and its index
+    max_y = np.max(y)
+    min_y = np.min(y)
+    max_idx = np.argmax(y)
+    # Calculate the half maximum value
+    half_max = lerp(min_y, max_y, .5)
+    left_index = max_idx
+    upper_bound = max_idx
+    lower_bound = 0
+    while abs(yatx(left_index, y) - half_max) > .01:
+        left_index = lerp(lower_bound, upper_bound, .5)
+        if yatx(left_index, y) > half_max:
+            upper_bound = left_index
+        else: 
+            lower_bound = left_index
+            
+    left_index = max_idx
+    upper_bound = x[len(x)-1]
+    lower_bound = max_idx
+    right_index = max_idx
+    while abs(yatx(right_index, y) - half_max) > .01:
+        right_index = lerp(lower_bound, upper_bound, .5)
+        if yatx(right_index, y) > half_max:
+            upper_bound = right_index
+        else: 
+            lower_bound = right_index
+        
+    
     
 # Code to write peak data to stats
 def peak(x, y, roi):

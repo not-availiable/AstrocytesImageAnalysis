@@ -134,18 +134,11 @@ def display_data(graphData):
     global connection_list
     global min_intensity
     global max_intensity
+    global pre_offset
+    global post_offset
+    global split_point
 
     graphData = np.delete(graphData, len(graphData), 1)
-
-    split_point = len(pre_image_paths)
-
-    pre_offset = []
-    for i in range(0, len(pre_image_paths)):
-        pre_offset.append(i*3)
-
-    post_offset = []
-    for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
-        post_offset.append(i*3)
 
     for i in range(len(masks)):
         plt.clf()
@@ -172,7 +165,6 @@ def display_data(graphData):
         plt.xlabel("time (seconds)")
         plt.ylabel("normalized intensity")
         plt.savefig("plot" + str(i), format="png")
-    return pre_offset, post_offset
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -300,10 +292,22 @@ if __name__ == '__main__':
     min_intensity = np.min(min_intensities)
     max_intensity = np.max(max_intensities)
 
-    # stitch together all of the masks
-    pre, post = display_data(graphData)
+    split_point = len(pre_image_paths)
 
-    anal.getStats(nucDat, len(masks), pre + post, graphData, dead_cell)
+    pre_offset = []
+    for i in range(0, len(pre_image_paths)):
+        pre_offset.append(i)
+
+    post_offset = []
+    for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
+        post_offset.append(i)
+
+    # stitch together all of the masks
+    display_data(graphData)
+
+    print("Test:")
+    print(pre_offset + post_offset)
+    anal.getStats(nucDat, len(masks), pre_offset + post_offset, graphData, dead_cell)
 
     end_time = time.time()
     execution_time = end_time - start_time
