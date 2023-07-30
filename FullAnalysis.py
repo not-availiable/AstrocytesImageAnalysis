@@ -62,9 +62,10 @@ def cell(nucDat, roi, shock):
 # Code to get centers
 def getCenters(nucDat):
     global centers
+    centers = []
     nucOutlines = utils.outlines_list(nucDat)
     for outline in range(len(nucOutlines)):
-        centers.append((int(outline[:, 1].mean()), int(outline[:, 0].mean())))
+        centers.append((int(outline[:, 0].mean()), int(outline[:, 1].mean())))
         
 # Integral
 def integral(x, y, roi):
