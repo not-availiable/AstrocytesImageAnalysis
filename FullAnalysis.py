@@ -30,7 +30,17 @@ def create_csv():
     statsdf = pd.DataFrame(stats)
     statsdf.to_csv('AstrocyteStats.csv', index = False)
 
+def lerp(start, end, t):
+    return start * (1 - t) + end * t
+
 # Line intersection for FWHM
+def yatx(x, y):
+    y_lower = y[math.floor(x)]
+    y_upper = y[math.ceil(x)]
+    decimal = x % 1
+    return lerp(y_lower, y_upper, decimal)
+    
+
 def FWHM(x, y, roi):
     # Get half the max of y
     half_max = (np.max(y) + np.min(y)) / 2.0
