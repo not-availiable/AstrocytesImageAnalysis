@@ -33,7 +33,7 @@ def create_csv():
 # Line intersection for FWHM
 def FWHM(x, y, roi):
     # Get half the max of y
-    half_max = max(y) / 2.0
+    half_max = (np.max(y) + np.min(y)) / 2.0
     # Find the left and right indices where the peak crosses half_max
     left_idx = None
     right_idx = None
