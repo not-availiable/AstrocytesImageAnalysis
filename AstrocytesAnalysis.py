@@ -1,4 +1,3 @@
-from audioop import mul
 import sys
 import os
 import math
@@ -13,6 +12,8 @@ from natsort import natsorted
 from tqdm import tqdm
 from multiprocessing import Pool
 from skimage.transform import rescale
+import seaborn as sns
+sns.set_style("whitegrid")
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
@@ -27,7 +28,7 @@ def get_center_location(o):
         return None, None
 
 # function to generate the masks for each cell
-def generate_masks():
+def generate_masks(): 
     try:
         i = 0
         # loop through each nuclei outline
@@ -38,7 +39,8 @@ def generate_masks():
             plt.annotate(str(i), (centerX, centerY), color="white")
             # plot the outline of the nuclei
             plt.plot(o[:,0], o[:,1], color='r')
-
+            # the rest of your code remains the same
+            
             # calculate the standard deviation of the x and y coordinates
             stdX = np.std(o[:,0])
             stdY = np.std(o[:,1])
@@ -72,6 +74,162 @@ def generate_masks():
             i += 1
     except Exception as e:
         print(f"Error in generate_masks: {e}")
+# Function to display the normalized data
+def display_normalized_data(graphData, samplingImage, pre_image_paths, post_image_paths):
+    try:
+        # initialize an empty mask
+        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
+        # combine all masks into one
+        for mask in masks:
+            fullMask = np.logical_or(fullMask, mask)
+
+        # create a copy of the sampling image with three channels
+        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
+        # copy the green channel from the original sampling image to the copy
+        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
+        # set the red and blue channels of the masked region to 0
+        samplingImage_copy[~fullMask, 0] = 0
+        samplingImage_copy[~fullMask, 2] = 0
+        # display the image
+        plt.imshow(samplingImage_copy)
+        # save the image as a PNG
+        plt.savefig("masks", format="png")
+
+        # calculate the split point between pre and post image paths
+        split_point = len(pre_image_paths)
+        # calculate the offset for the post image paths
+        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+
+        # loop through each mask
+        for i in range(len(masks)):
+            # clear the current figure
+            fig, ax = plt.subplots()
+
+            # 
+            ax.set_title("Normalized Data for Mask " + str(i), fontsize=14, fontweight='bold')
+            ax.set_xlabel("Images of cells over time", fontsize=12)
+            ax.set_ylabel("Normalized Intensity", fontsize=12)
+
+            # plot the pre image data
+            ax.plot(graphData[i][:split_point], color="blue", label="Pre-image data")
+
+            # plot the connecting line
+            x_points = np.array([split_point-1, split_point])
+            y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
+            ax.plot(x_points, y_points, color="black", linestyle="--", label="Connecting line")
+
+            # plot the post image data
+            num_points = min(len(post_offset), len(graphData[i][split_point-1:]))
+            ax.plot(post_offset[:num_points], graphData[i][split_point-1:][:num_points], color="red", label="Post-image data")
+
+            # adjust y limit for normalized data
+            ax.set_ylim(0, 2)
+
+            # calculate the difference in intensity between the last pre-image data and the first post-image data
+            intensity_diff = graphData[i][split_point] - graphData[i][split_point-1]
+            # annotate the difference on the plot
+            ax.annotate('Diff: {:.2f}'.format(intensity_diff), xy=(split_point, 1.75), xycoords='data', fontsize=10)
+
+            # add a legend
+            ax.legend(loc='upper right')
+
+            # Adjust plot dimensions to prevent legend cut-off
+            plt.tight_layout()
+
+            # save the plot as a PNG
+            plt.savefig("plot" + str(i), format="png")
+
+        # print the execution time
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"The function took {execution_time} seconds to run.")
+    except ValueError as ve:
+        print(f"ValueError: {ve}")
+        print("Error occurred while plotting the data.")
+    except IndexError as ie:
+        print(f"IndexError: {ie}")
+        print("Error occurred during indexing. Check the dimensions of arrays.")
+    except Exception as e:
+        print(f"Error: {e}")
+        print("An unexpected error occurred.")
+# Function to display the raw data
+def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
+    try:
+        # initialize an empty mask
+        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
+        # combine all masks into one
+        for mask in masks:
+            fullMask = np.logical_or(fullMask, mask)
+
+        # create a copy of the sampling image with three channels
+        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
+        # copy the green channel from the original sampling image to the copy
+        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
+        # set the red and blue channels of the masked region to 0
+        samplingImage_copy[~fullMask, 0] = 0
+        samplingImage_copy[~fullMask, 2] = 0
+        # display the image
+        plt.imshow(samplingImage_copy)
+        # save the image as a PNG
+        plt.savefig("masks_raw", format="png")
+
+        # calculate the split point between pre and post image paths
+        split_point = len(pre_image_paths)
+        # calculate the offset for the post image paths
+        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+
+        # loop through each mask
+        for i in range(len(masks)):
+            # clear the current figure
+            fig, ax = plt.subplots()
+
+
+            ax.set_title("Raw Data for Mask " + str(i), fontsize=14, fontweight='bold')
+            ax.set_xlabel("Images of cells over time", fontsize=12)
+            ax.set_ylabel("Raw Intensity", fontsize=12)
+
+            # plot the pre image data
+            ax.plot(rawData[i][:split_point], color="blue", label="Pre-image data")
+
+            # plot the connecting line
+            x_points = np.array([split_point-1, split_point])
+            y_points = np.array([rawData[i][split_point-1], rawData[i][split_point]])
+            ax.plot(x_points, y_points, color="black", linestyle="--", label="Connecting line")
+
+            # plot the post image data
+            num_points = min(len(post_offset), len(rawData[i][split_point-1:]))
+            ax.plot(post_offset[:num_points], rawData[i][split_point-1:][:num_points], color="red", label="Post-image data")
+
+            # adjust y limit for raw data
+            ax.set_ylim(0, 2)
+
+            # calculate the difference in intensity between the last pre-image data and the first post-image data
+            intensity_diff = rawData[i][split_point] - rawData[i][split_point-1]
+            # annotate the difference on the plot
+            ax.annotate('Diff: {:.2f}'.format(intensity_diff), xy=(split_point, 1.75), xycoords='data', fontsize=10)
+
+            # add a legend
+            ax.legend(loc='upper right')
+
+            # Adjust plot dimensions to prevent legend cut-off
+            plt.tight_layout()
+
+            # save the plot as a PNG
+            plt.savefig("plot_raw" + str(i), format="png")
+
+        # print the execution time
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"The function took {execution_time} seconds to run.")
+    except ValueError as ve:
+        print(f"ValueError: {ve}")
+        print("Error occurred while plotting the data.")
+    except IndexError as ie:
+        print(f"IndexError: {ie}")
+        print("Error occurred during indexing. Check the dimensions of arrays.")
+    except Exception as e:
+        print(f"Error: {e}")
+        print("An unexpected error occurred.")
 
 # function to save the masks to a numpy array file
 def save_masks(masks):
@@ -80,9 +238,9 @@ def save_masks(masks):
         combined_mask = np.empty(())
         # loop through each mask and stack it to the combined mask
         for mask in masks:
-            combined_mask = np.dstack(combined_mask, mask)
+            combined_mask = np.dstack((combined_mask, mask))
         # save the combined mask to a numpy array file
-        np.save("masks.npy",combined_mask)
+        np.save("masks.npy", combined_mask)
     except Exception as e:
         print(f"Error in save_masks: {e}")
 
@@ -130,118 +288,6 @@ def sample_data(filedata):
     except Exception as e:
         print(f"Error occurred while sampling data: {e}")
         return None, None, None
-
-# function to display the normalized data
-def display_normalized_data(graphData, samplingImage):
-    try:
-        # initialize an empty mask
-        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
-        for mask in masks:
-            fullMask = np.logical_or(fullMask, mask)
-
-        # create a copy of the sampling image with three channels
-        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
-        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
-        samplingImage_copy[~fullMask, 0] = 0
-        samplingImage_copy[~fullMask, 2] = 0
-        # display the image
-        plt.imshow(samplingImage_copy)
-        # save the image as a PNG
-        plt.savefig("masks", format="png")
-
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
-
-        # loop through each mask
-        for i in range(len(masks)):
-            # clear the current figure
-            plt.clf()
-            # plot the pre image data
-            plt.plot(graphData[i][:split_point], color="blue")
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-            plt.plot(x_points, y_points, color="red")
-            # plot the post image data
-            num_points = min(len(post_offset), len(graphData[i][split_point-1:]))
-            plt.plot(post_offset[:num_points], graphData[i][split_point-1:][:num_points], color="red")
-            # save the plot as a PNG
-            plt.savefig("plot" + str(i), format="png")
-
-        # print the execution time
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"The function took {execution_time} seconds to run.")
-    except ValueError as ve:
-        print(f"ValueError: {ve}")
-        print("Error occurred while plotting the data.")
-    except IndexError as ie:
-        print(f"IndexError: {ie}")
-        print("Error occurred during indexing. Check the dimensions of arrays.")
-    except Exception as e:
-        print(f"Error: {e}")
-        print("An unexpected error occurred.")
-
-# function to display the raw data
-def display_raw_data(rawData, samplingImage):
-    try:
-        # initialize an empty mask
-        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
-        for mask in masks:
-            fullMask = np.logical_or(fullMask, mask)
-
-        # create a copy of the sampling image with three channels
-        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
-        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
-        samplingImage_copy[~fullMask, 0] = 0
-        samplingImage_copy[~fullMask, 2] = 0
-        # display the image
-        plt.imshow(samplingImage_copy)
-        # save the image as a PNG
-        plt.savefig("masks_raw", format="png")
-
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
-
-        # loop through each mask
-        for i in range(len(masks)):
-            # clear the current figure
-            plt.clf()
-            # plot the pre image data
-            plt.plot(rawData[i][:split_point], color="blue")
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([rawData[i][split_point-1], rawData[i][split_point]])
-            plt.plot(x_points, y_points, color="red")
-            # plot the post image data
-            num_points = min(len(post_offset), len(rawData[i][split_point-1:]))
-            plt.plot(post_offset[:num_points], rawData[i][split_point-1:][:num_points], color="red")
-            # save the plot as a PNG
-            plt.savefig("plot_raw" + str(i), format="png")
-
-        # print the execution time
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"The function took {execution_time} seconds to run.")
-    except ValueError as ve:
-        print(f"ValueError: {ve}")
-        print("Error occurred while plotting the data.")
-    except IndexError as ie:
-        print(f"IndexError: {ie}")
-        print("Error occurred during indexing. Check the dimensions of arrays.")
-    except Exception as e:
-        print(f"Error: {e}")
-        print("An unexpected error occurred.")
 
 # function to create a circular mask
 def create_circular_mask(h, w, center=None, radius=None):
@@ -369,6 +415,6 @@ if __name__ == '__main__':
     np.save("raw_data.npy", rawData)
 
     # display the normalized data
-    display_normalized_data(graphData, samplingImage)
+    display_normalized_data(graphData, samplingImage, pre_image_paths, post_image_paths)
     # display the raw data
-    display_raw_data(rawData, samplingImage)
+    display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths)
