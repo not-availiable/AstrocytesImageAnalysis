@@ -82,5 +82,5 @@ def getStats(nucDat, rois, x, ally, shockwavedCell):
         FWHM(x, ally[roi], roi)
         peak(x, ally[roi], roi)
         cell(nucDat, roi, shockwavedCell)
-        integral(x, ally[roi])
+        integral(x, ally[roi], roi)
     create_csv()
