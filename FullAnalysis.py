@@ -42,6 +42,7 @@ def FWHM(x, y, roi):
     right_idx = max_idx + np.argmin(np.abs(y[max_idx:] - half_max))
     # Calculate the FWHM
     fwhm = x[right_idx] - x[left_idx]
+    print(fwhm)
     # Write to the data
     stats['FWHM'][roi] = fwhm
     stats['FWHM_Left_Index'][roi] = left_idx
