@@ -131,6 +131,14 @@ def display_normalized_data(graphData, samplingImage, pre_image_paths, post_imag
             post_avg = np.mean(graphData[i][len(pre_timestamps):])
             ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.6, 0.85), xycoords='axes fraction')
 
+            # Calculate and display the peak intensity
+            peak_intensity_time = pre_timestamps + post_timestamps
+            peak_intensity_index = np.argmax(graphData[i])
+            peak_intensity = graphData[i][peak_intensity_index]
+            ax.annotate(f'Peak: {peak_intensity:.2f}', xy=(peak_intensity_time[peak_intensity_index], peak_intensity),
+                        xytext=(0.6, 0.80), xycoords='data', textcoords='axes fraction',
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=5))
+
             # Add labels and titles
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Normalized Intensity')
@@ -138,10 +146,9 @@ def display_normalized_data(graphData, samplingImage, pre_image_paths, post_imag
 
             # Set the y-axis limits
             ax.set_ylim([0, 2])
-
             # Add a grid and legend
             ax.grid(True)
-            ax.legend(loc='upper right', bbox_to_anchor=(1, 0.8))
+            ax.legend(loc='upper right', bbox_to_anchor=(1, 1))
 
             # Adjust layout and save the plot
             fig.tight_layout()
@@ -163,6 +170,7 @@ def display_normalized_data(graphData, samplingImage, pre_image_paths, post_imag
     except Exception as e:
         print(f"Error: {e}")
         print("An unexpected error occurred.")
+
 
 # Function to display the raw data
 def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
@@ -218,6 +226,14 @@ def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
             post_avg = np.mean(rawData[i][len(pre_timestamps):])
             ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.6, 0.85), xycoords='axes fraction')
 
+            # Calculate and display the peak intensity
+            peak_intensity_time = pre_timestamps + post_timestamps
+            peak_intensity_index = np.argmax(rawData[i])
+            peak_intensity = rawData[i][peak_intensity_index]
+            ax.annotate(f'Peak: {peak_intensity:.2f}', xy=(peak_intensity_time[peak_intensity_index], peak_intensity),
+                        xytext=(0.6, 0.80), xycoords='data', textcoords='axes fraction',
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=5))
+
             # Add labels and titles
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Raw Intensity')
@@ -225,7 +241,7 @@ def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
 
             # Add a grid and legend
             ax.grid(True)
-            ax.legend(loc='upper right', bbox_to_anchor=(1, 0.8))
+            ax.legend(loc='upper right', bbox_to_anchor=(1, 1))
 
             # Adjust layout and save the plot
             fig.tight_layout()
