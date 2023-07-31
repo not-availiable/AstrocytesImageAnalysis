@@ -129,14 +129,14 @@ def display_normalized_data(graphData, samplingImage, pre_image_paths, post_imag
             # Calculate and display the average difference in intensity
             pre_avg = np.mean(graphData[i][:len(pre_timestamps)])
             post_avg = np.mean(graphData[i][len(pre_timestamps):])
-            ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.6, 0.85), xycoords='axes fraction')
+            ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.8, 0.75), xycoords='axes fraction')
 
             # Calculate and display the peak intensity
             peak_intensity_time = pre_timestamps + post_timestamps
             peak_intensity_index = np.argmax(graphData[i])
             peak_intensity = graphData[i][peak_intensity_index]
             ax.annotate(f'Peak: {peak_intensity:.2f}', xy=(peak_intensity_time[peak_intensity_index], peak_intensity),
-                        xytext=(0.6, 0.80), xycoords='data', textcoords='axes fraction',
+                        xytext=(0.8, 0.7), xycoords='data', textcoords='axes fraction',
                         arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=5))
 
             # Add labels and titles
@@ -207,7 +207,6 @@ def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
         # Loop through each mask
         for i in range(len(masks)):
             fig, ax = plt.subplots()
-
             # Plot the pre-image data
             ax.plot(pre_timestamps, rawData[i][:len(pre_timestamps)], color="blue", label="Pre-image data")
 
