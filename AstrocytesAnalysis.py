@@ -1,8 +1,7 @@
-import sys
+# Import the necessary libraries
 import os
 import math
 import numpy as np
-import numpy.ma as ma
 from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
@@ -13,133 +12,145 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from skimage.transform import rescale
 import seaborn as sns
+from datetime import datetime
+
+# Set the style of the graphs to whitegrid
 sns.set_style("whitegrid")
 
-# start timer to measure how long code takes to execute
+# Start a timer to calculate the total execution time
 start_time = time.time()
 
-# function to calculate the center location of a mask
+# Function to get the center location of a given object
 def get_center_location(o):
     try:
-        # calculates the mean of the coordinates to get the center
+        # Return the mean of the x and y coordinates
         return o[:, 0].mean(), o[:, 1].mean()  
     except Exception as e:
         print(f"Error in get_center_location: {e}")
         return None, None
 
-# function to generate the masks for each cell
+# Function to generate masks around the identified cells
 def generate_masks(): 
     try:
+        # Initialize a counter
         i = 0
-        # loop through each nuclei outline
+        # Loop through each nuclei outline
         for o in nucOutlines:
-            # calculate center of the nuclei
+            # Calculate the center of the nuclei
             centerX, centerY = get_center_location(o)
-            # add the center location to the plot
+            # Add the center location to the plot
             plt.annotate(str(i), (centerX, centerY), color="white")
-            # plot the outline of the nuclei
+            # Plot the outline of the nuclei
             plt.plot(o[:,0], o[:,1], color='r')
-            # the rest of your code remains the same
             
-            # calculate the standard deviation of the x and y coordinates
+            # Calculate the standard deviation of the x and y coordinates
             stdX = np.std(o[:,0])
             stdY = np.std(o[:,1])
             stdMax = max(stdX, stdY)
 
-            # set flag to check if there is a cytoplasm close to the nuclei
+            # Flag to check if there is a cytoplasm close to the nuclei
             hasCloseCytoplasm = False
             closeMaskId = 1
-            # loop through each cytoplasm outline
+            # Loop through each cytoplasm outline
             for c in cytoOutlines: 
-                # calculate center of the cytoplasm
+                # Calculate the center of the cytoplasm
                 cytoCenterX, cytoCenterY = get_center_location(c)
-                # if the distance between the nuclei and cytoplasm is less than 50, set the flag to True
+                # If the distance between the nuclei and cytoplasm is less than 50, set the flag to True
                 if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
                     hasCloseCytoplasm = True
                     break
-                closeMaskId+=1
+                closeMaskId += 1
 
-            # use only the relevant part of the cytoplasm mask 
+            # Use only the relevant part of the cytoplasm mask
             mask = cytoWholeMask == closeMaskId
-            # if there are no valid cytoplasm masks, use a circular mask
+            # If there are no valid cytoplasm masks, use a circular mask
             if not hasCloseCytoplasm:
                 plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
                 h, w = samplingImage.shape[:2]
                 mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
             
-            # remove the nucleus from the mask
+            # Remove the nucleus from the mask
             mask[nucWholeMask] = 0
-            # add the mask to the list of masks
+            # Add the mask to the list of masks
             masks.append(mask)
             i += 1
     except Exception as e:
         print(f"Error in generate_masks: {e}")
+
 # Function to display the normalized data
 def display_normalized_data(graphData, samplingImage, pre_image_paths, post_image_paths):
     try:
-        # initialize an empty mask
+        # Initialize an empty mask
         fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
+        # Combine all masks into one
         for mask in masks:
             fullMask = np.logical_or(fullMask, mask)
 
-        # create a copy of the sampling image with three channels
+        # Create a copy of the sampling image with three channels
         samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
+        # Copy the green channel from the original sampling image to the copy
         samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
+        # Set the red and blue channels of the masked region to 0
         samplingImage_copy[~fullMask, 0] = 0
         samplingImage_copy[~fullMask, 2] = 0
-        # display the image
+        # Display the image
         plt.imshow(samplingImage_copy)
-        # save the image as a PNG
+        # Save the image as a PNG
         plt.savefig("masks", format="png")
 
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+        # Extract timestamps from image names
+        pre_timestamps = [extract_timestamp(name) for name in pre_image_paths]
+        post_timestamps = [extract_timestamp(name) for name in post_image_paths]
 
-        # loop through each mask
+        # Calculate zero time as the midpoint between pre and post images
+        zero_time = datetime.fromtimestamp((pre_timestamps[-1].timestamp() + post_timestamps[0].timestamp()) / 2)
+
+        # Convert timestamps to seconds relative to zero time
+        pre_timestamps = [(t - zero_time).total_seconds() for t in pre_timestamps]
+        post_timestamps = [(t - zero_time).total_seconds() for t in post_timestamps]
+
+        # Loop through each mask
         for i in range(len(masks)):
-            # clear the current figure
             fig, ax = plt.subplots()
 
-            # 
-            ax.set_title("Normalized Data for Mask " + str(i), fontsize=14, fontweight='bold')
-            ax.set_xlabel("Images of cells over time", fontsize=12)
-            ax.set_ylabel("Normalized Intensity", fontsize=12)
+            # Plot the pre-image data
+            ax.plot(pre_timestamps, graphData[i][:len(pre_timestamps)], color="blue", label="Pre-image data")
 
-            # plot the pre image data
-            ax.plot(graphData[i][:split_point], color="blue", label="Pre-image data")
+            # Plot the post-image data
+            ax.plot(post_timestamps[:len(graphData[i][len(pre_timestamps):])], graphData[i][len(pre_timestamps):], color="red", label="Post-image data")
 
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-            ax.plot(x_points, y_points, color="black", linestyle="--", label="Connecting line")
+            # Plot a connecting line between the last pre-image data point and the first post-image data point
+            last_pre_time = pre_timestamps[-1]
+            last_pre_intensity = graphData[i][len(pre_timestamps)-1]
+            first_post_time = post_timestamps[0]
+            first_post_intensity = graphData[i][len(pre_timestamps)]
+            ax.plot([last_pre_time, first_post_time], [last_pre_intensity, first_post_intensity], color="green", label="Pre-post connection")
 
-            # plot the post image data
-            num_points = min(len(post_offset), len(graphData[i][split_point-1:]))
-            ax.plot(post_offset[:num_points], graphData[i][split_point-1:][:num_points], color="red", label="Post-image data")
+            # Calculate and display the average difference in intensity
+            pre_avg = np.mean(graphData[i][:len(pre_timestamps)])
+            post_avg = np.mean(graphData[i][len(pre_timestamps):])
+            ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.6, 0.85), xycoords='axes fraction')
 
-            # adjust y limit for normalized data
-            ax.set_ylim(0, 2)
+            # Add labels and titles
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Normalized Intensity')
+            ax.set_title(f'Normalized Intensity vs Time for Mask {i+1}')
 
-            # calculate the difference in intensity between the last pre-image data and the first post-image data
-            intensity_diff = graphData[i][split_point] - graphData[i][split_point-1]
-            # annotate the difference on the plot
-            ax.annotate('Diff: {:.2f}'.format(intensity_diff), xy=(split_point, 1.75), xycoords='data', fontsize=10)
+            # Set the y-axis limits
+            ax.set_ylim([0, 2])
 
-            # add a legend
-            ax.legend(loc='upper right')
+            # Add a grid and legend
+            ax.grid(True)
+            ax.legend(loc='upper right', bbox_to_anchor=(1, 0.8))
 
-            # Adjust plot dimensions to prevent legend cut-off
-            plt.tight_layout()
-
-            # save the plot as a PNG
+            # Adjust layout and save the plot
+            fig.tight_layout()
             plt.savefig("plot" + str(i), format="png")
 
-        # print the execution time
+            # Close the figure to free up memory
+            plt.close(fig)
+
+        # Calculate and print the execution time
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"The function took {execution_time} seconds to run.")
@@ -152,72 +163,78 @@ def display_normalized_data(graphData, samplingImage, pre_image_paths, post_imag
     except Exception as e:
         print(f"Error: {e}")
         print("An unexpected error occurred.")
+
 # Function to display the raw data
 def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
     try:
-        # initialize an empty mask
+        # Initialize an empty mask
         fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
+        # Combine all masks into one
         for mask in masks:
             fullMask = np.logical_or(fullMask, mask)
 
-        # create a copy of the sampling image with three channels
+        # Create a copy of the sampling image with three channels
         samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
+        # Copy the green channel from the original sampling image to the copy
         samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
+        # Set the red and blue channels of the masked region to 0
         samplingImage_copy[~fullMask, 0] = 0
         samplingImage_copy[~fullMask, 2] = 0
-        # display the image
+        # Display the image
         plt.imshow(samplingImage_copy)
-        # save the image as a PNG
+        # Save the image as a PNG
         plt.savefig("masks_raw", format="png")
 
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+        # Extract timestamps from image names
+        pre_timestamps = [extract_timestamp(name) for name in pre_image_paths]
+        post_timestamps = [extract_timestamp(name) for name in post_image_paths]
 
-        # loop through each mask
+        # Calculate zero time as the midpoint between pre and post images
+        zero_time = datetime.fromtimestamp((pre_timestamps[-1].timestamp() + post_timestamps[0].timestamp()) / 2)
+
+        # Convert timestamps to seconds relative to zero time
+        pre_timestamps = [(t - zero_time).total_seconds() for t in pre_timestamps]
+        post_timestamps = [(t - zero_time).total_seconds() for t in post_timestamps]
+
+        # Loop through each mask
         for i in range(len(masks)):
-            # clear the current figure
             fig, ax = plt.subplots()
 
+            # Plot the pre-image data
+            ax.plot(pre_timestamps, rawData[i][:len(pre_timestamps)], color="blue", label="Pre-image data")
 
-            ax.set_title("Raw Data for Mask " + str(i), fontsize=14, fontweight='bold')
-            ax.set_xlabel("Images of cells over time", fontsize=12)
-            ax.set_ylabel("Raw Intensity", fontsize=12)
+            # Plot the post-image data
+            ax.plot(post_timestamps[:len(rawData[i][len(pre_timestamps):])], rawData[i][len(pre_timestamps):], color="red", label="Post-image data")
 
-            # plot the pre image data
-            ax.plot(rawData[i][:split_point], color="blue", label="Pre-image data")
+            # Plot a connecting line between the last pre-image data point and the first post-image data point
+            last_pre_time = pre_timestamps[-1]
+            last_pre_intensity_raw = rawData[i][len(pre_timestamps)-1]
+            first_post_time = post_timestamps[0]
+            first_post_intensity_raw = rawData[i][len(pre_timestamps)]
+            ax.plot([last_pre_time, first_post_time], [last_pre_intensity_raw, first_post_intensity_raw], color="green", label="Pre-Post connection")
 
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([rawData[i][split_point-1], rawData[i][split_point]])
-            ax.plot(x_points, y_points, color="black", linestyle="--", label="Connecting line")
+            # Calculate and display the average difference in intensity
+            pre_avg = np.mean(rawData[i][:len(pre_timestamps)])
+            post_avg = np.mean(rawData[i][len(pre_timestamps):])
+            ax.annotate(f'Diff: {post_avg - pre_avg:.2f}', xy=(0.6, 0.85), xycoords='axes fraction')
 
-            # plot the post image data
-            num_points = min(len(post_offset), len(rawData[i][split_point-1:]))
-            ax.plot(post_offset[:num_points], rawData[i][split_point-1:][:num_points], color="red", label="Post-image data")
+            # Add labels and titles
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Raw Intensity')
+            ax.set_title(f'Raw Intensity vs Time for Mask {i+1}')
 
-            # adjust y limit for raw data
-            ax.set_ylim(0, 2)
+            # Add a grid and legend
+            ax.grid(True)
+            ax.legend(loc='upper right', bbox_to_anchor=(1, 0.8))
 
-            # calculate the difference in intensity between the last pre-image data and the first post-image data
-            intensity_diff = rawData[i][split_point] - rawData[i][split_point-1]
-            # annotate the difference on the plot
-            ax.annotate('Diff: {:.2f}'.format(intensity_diff), xy=(split_point, 1.75), xycoords='data', fontsize=10)
-
-            # add a legend
-            ax.legend(loc='upper right')
-
-            # Adjust plot dimensions to prevent legend cut-off
-            plt.tight_layout()
-
-            # save the plot as a PNG
+            # Adjust layout and save the plot
+            fig.tight_layout()
             plt.savefig("plot_raw" + str(i), format="png")
 
-        # print the execution time
+            # Close the figure to free up memory
+            plt.close(fig)
+
+        # Calculate and print the execution time
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"The function took {execution_time} seconds to run.")
@@ -231,190 +248,167 @@ def display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths):
         print(f"Error: {e}")
         print("An unexpected error occurred.")
 
-# function to save the masks to a numpy array file
+# Function to save the masks to a numpy array file
 def save_masks(masks):
     try:
-        # initialize an empty array
-        combined_mask = np.empty(())
-        # loop through each mask and stack it to the combined mask
+        # Initialize an empty array
+        combined_mask = np.empty((masks[0].shape[0], masks[0].shape[1], 0))
+
+        # Loop through each mask and stack it to the combined mask
         for mask in masks:
-            combined_mask = np.dstack((combined_mask, mask))
-        # save the combined mask to a numpy array file
+            if mask.shape == masks[0].shape:  # ensure that all masks have the same size
+                combined_mask = np.dstack((combined_mask, mask))
+            else:
+                print(f"Skipping mask due to size mismatch: expected {masks[0].shape}, got {mask.shape}")
+                
+        # Save the combined mask to a numpy array file
         np.save("masks.npy", combined_mask)
     except Exception as e:
         print(f"Error in save_masks: {e}")
 
-# function to sample the data from the image files
+# Function to sample data from the given file
 def sample_data(filedata):
     global first_image_sample
     global first_image_normalized_intensities
 
     try:
-        # unpack the filedata into filepath and insert_index
         filepath, insert_index = filedata
-        # print the index
         print(insert_index)
-        # read the image file
         samplingImage = plt.imread(filepath)
-        # downscale the image for faster cellpose readability
         samplingImage = rescale(samplingImage, 0.8, anti_aliasing=True)
 
-        # initialize temp arrays for storing intensity data
         temp = []
         temp_raw = []
-        # calculate the minimum intensity of the image
         min_intensity = np.min(samplingImage)
-        # loop through each mask
         for mask in masks:
-            # calculate the intensity of the mask
             intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-            # add the intensity to the raw temp array
             temp_raw.append(intensity)
-            # calculate the normalized intensity
             normalized_intensity = (intensity - min_intensity)
-            # add the normalized intensity to the temp array
             temp.append(normalized_intensity)
-            # if it's the first image, add the normalized intensity to the first image normalized intensities array
             if first_image_sample:
                 first_image_normalized_intensities.append(normalized_intensity)
         
-        # set the first image sample flag to False after the first image
         first_image_sample = False
-        # normalize the temp array
         temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
-        # return the normalized intensities, index, and raw intensities
         return temp, insert_index, temp_raw
     except Exception as e:
         print(f"Error occurred while sampling data: {e}")
         return None, None, None
 
-# function to create a circular mask
+# Function to create a circular mask
 def create_circular_mask(h, w, center=None, radius=None):
     try:
-        # if no center is provided, use the center of the image
         if center is None:
             center = (int(w/2), int(h/2))
-        # if no radius is provided, use the smallest distance between the center and the image edges
         if radius is None:
             radius = min(center[0], center[1], w-center[0], h-center[1])
 
-        # generate a grid of coordinates
         Y, X = np.ogrid[:h, :w]
-        # calculate the distance from each coordinate to the center
         dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
-        # generate a mask for coordinates within the radius
         mask = dist_from_center <= radius
         return mask
     except Exception as e:
         print(f"Error in create_circular_mask: {e}")
         return None
 
-# main script
+# Function to extract the timestamp from the given filename
+def extract_timestamp(filename):
+    from datetime import datetime
+    # Extract the timestamp string from the filename
+    timestamp_str = filename.split('T')[0] + 'T' + filename.split('T')[1].split('Z')[0]
+    # Truncate the last digit from the microseconds
+    timestamp_str = timestamp_str[:-1]
+    # Correctly parse the timestamp string
+    return datetime.strptime(timestamp_str, "%Y-%m-%dT%H_%M_%S_%f")
+
+# Main function
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
-    # load the config file
+    # Load the configuration from a JSON file
     config = []
     with open("config.json") as f:
         config = json.load(f)
 
-    # get the directory paths for pre and post images
+    # Reading the directories
     pre_dir_path = config["pre_directory_location"]
     post_dir_path = config["post_directory_location"]
-    # get the image paths within each directory
     pre_image_paths = os.listdir(pre_dir_path)
     pre_image_paths = natsorted(pre_image_paths)
     post_image_paths = os.listdir(post_dir_path)
     post_image_paths = natsorted(post_image_paths)
-    
-    # read the last pre image
-    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[-1]))
 
-    # downscale the image for faster cellpose readability
+    # Loading the sampling image
+    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[-1]))
     samplingImage = rescale(samplingImage, 0.8, anti_aliasing=True)
 
-    # set the first image sample flag to True
+    # Setting the first image sample flag
     first_image_sample = True
-    # initialize the first image normalized intensities array
     first_image_normalized_intensities = []
 
-    # load the Cellpose models for nuclei and cytoplasm
+    # Creating the cellpose models
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
-    # start the timer for cellpose
+    # Running the cellpose model on the sample image
     start2=time.time()
-    # evaluate the image with the Cellpose models
     nucDat = nucModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
-    # stop the timer for cellpose
     end2=time.time()
-    # print the time taken for cellpose
     final=end2-start2
     print(final)
 
-    # get the outlines for each nucleus and cytoplasm
+    # Extracting the outlines from the cellpose output
     nucOutlines = utils.outlines_list(nucDat)
     cytoOutlines = utils.outlines_list(cytoDat)
 
-    # initialize the masks array
+    # Initializing the masks
     masks = []
-    # get the whole mask for each nucleus
     nucWholeMask = nucDat
-    # binarize the nucleus mask
     nucWholeMask = nucWholeMask > 0
-    # get the whole mask for each cytoplasm
     cytoWholeMask = cytoDat
 
-    # generate the masks
+    # Generating the masks
     generate_masks()
 
-    # initialize the graph data and raw data arrays
+    # Initializing the graph data
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
     rawData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
     print(np.shape(graphData))
 
-    # initialize the full image data array with the last pre image
+    # Setting up the full image data
     full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[-1]), 0)]
 
-    # sample the data from the first pre image
+    # Sampling the first image
     temp, insert_index, temp_raw = sample_data(full_image_data[0])
-    # add the data to the graph data and raw data arrays
     graphData[:,insert_index] = temp
     rawData[:,insert_index] = temp_raw
 
-    # add the rest of the pre images to the full image data array
+    # Setting up the full image data for the remaining images
     i = 0
     for image_path in pre_image_paths:
         if i > 0:
             full_image_data.append((os.path.join(pre_dir_path, image_path), i))
         i+=1
 
-    # add the post images to the full image data array
     for image_path in post_image_paths:
         full_image_data.append((os.path.join(post_dir_path, image_path), i))
         i+=1
 
-    # create a multiprocessing pool
-    p = Pool(16)
-    # map the sample_data function to the full image data array
-    for result in p.map(sample_data, full_image_data):
-        # unpack the result into temp, insert_index, and temp_raw
-        temp, insert_index, temp_raw = result
-        # add the data to the graph data and raw data arrays
-        graphData[:,insert_index] = temp
-        rawData[:,insert_index] = temp_raw
+    # Processing the images using multiprocessing
+    with Pool() as p:
+        res = p.map(sample_data, full_image_data[1:])
 
-    # close the multiprocessing pool
-    p.close()
-    p.join()
+    # Updating the graph data with the processed results
+    for temp, insert_index, temp_raw in res:
+        graphData[:, insert_index] = temp
+        rawData[:, insert_index] = temp_raw
 
-    # save the raw data to a numpy array file
-    np.save("raw_data.npy", rawData)
-
-    # display the normalized data
+    # Displaying the data
     display_normalized_data(graphData, samplingImage, pre_image_paths, post_image_paths)
-    # display the raw data
     display_raw_data(rawData, samplingImage, pre_image_paths, post_image_paths)
+
+    # Saving the masks
+    save_masks(masks)
