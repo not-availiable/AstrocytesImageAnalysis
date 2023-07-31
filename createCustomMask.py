@@ -23,7 +23,6 @@ def createTif(image,shockIndex,otherMaskIndex,bigMask,pathing):
     # Create numpy arrays for the first and second channels
     first_channel = np.zeros_like(src[:,:,0])
     third_channel = np.zeros_like(src[:,:,2])
-    second_channel = np.zeros_like(src[:,:,2])
     firstMask = bigMask == shockIndex
     thirdMask = bigMask == otherMaskIndex
     first_channel[firstMask] = 1
@@ -38,7 +37,7 @@ def createTif(image,shockIndex,otherMaskIndex,bigMask,pathing):
 def createPath(initialPath, classification,index,id):
     
     data_subfolder = "data"
-    folders = ["unconnected", "connected", "networked"]
+    folders = ["unconnected", "networked", "connected"]
     for folder in folders:
     # Use os.path.join to construct the full path to the directory
         directory = os.path.join(initialPath, data_subfolder, folder)
@@ -108,8 +107,8 @@ if __name__ == '__main__':
     print("---------------------------")
     print("Label each cell accordingly (relationship to shockwave)")
     print("0 - Not connected")
-    print("1 - directly connected")
-    print("2 - networked (indirectly connected)")
+    print("1 - networked (indirectly connected)")
+    print("2 - directly connected")
     print("3 - is Shockwave cell")
     print("---------------------------")
     print("Close the plot to continue")
