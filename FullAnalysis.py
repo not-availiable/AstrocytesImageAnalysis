@@ -42,25 +42,43 @@ def yatx(x, y):
     
 
 def FWHM(x, y, roi):
-    # Get half the max of y
-    half_max = (np.max(y) + np.min(y)) / 2.0
-    # Find the left and right indices where the peak crosses half_max
-    left_idx = None
-    right_idx = None
-    for idx in range(1, len(y)):
-        if y[idx - 1] <= half_max < y[idx]:
-            left_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
-        if y[idx - 1] >= half_max > y[idx]:
-            right_idx = idx - 1 + (half_max - y[idx - 1]) / (y[idx] - y[idx - 1])
-        if left_idx is not None and right_idx is not None:
+    # Find the maximum y-value and its index
+    max_y = np.max(y)
+    min_y = np.min(y)
+    max_idx = np.argmax(y)
+    # Calculate the half maximum value
+    half_max = lerp(min_y, max_y, .5)
+    left_idx = max_idx
+    upper_bound = max_idx
+    lower_bound = 0
+    attempts = 0
+    while abs(yatx(left_idx, y) - half_max) > .01:
+        if attempts > 50:
+            left_idx = 0
             break
-    # Incase there is no intersection, set to max/min of the x
-    if (left_idx is None):
-        left_idx = 0
-    if (right_idx is None):
-        right_idx = x[-1]
-    # Calculate the FWHM
-    fwhm = (x[int(right_idx)] + abs(x[int(right_idx)] - x[math.ceil(right_idx)]) * (right_idx % 1)) - (x[int(left_idx)] + abs(x[int(left_idx)] - x[math.ceil(left_idx)]) * (left_idx % 1))
+        left_idx = lerp(lower_bound, upper_bound, .5)
+        if yatx(left_idx, y) > half_max:
+            upper_bound = left_idx
+        else: 
+            lower_bound = left_idx
+        attempts+=1
+       
+    right_idx = max_idx     
+    upper_bound = x[len(x)-1]
+    lower_bound = max_idx
+    attempts = 0
+    while abs(yatx(right_idx, y) - half_max) > .01:
+        if attempts > 50:
+            right_idx = x[len(x)-1]
+            break
+        right_idx = lerp(lower_bound, upper_bound, .5)
+        if yatx(right_idx, y) > half_max:
+            lower_bound = right_idx
+        else: 
+            upper_bound = right_idx
+        attempts+=1
+    
+    fwhm = right_idx - left_idx
     # Write to the data
     stats['FWHM'][roi] = fwhm
     stats['FWHM_Left_Index'][roi] = left_idx
@@ -103,3 +121,4 @@ def getStats(nucDat, rois, x, ally, shockwavedCell):
         cell(nucDat, roi, shockwavedCell)
         integral(x, ally[roi], roi)
     create_csv()
+    return stats

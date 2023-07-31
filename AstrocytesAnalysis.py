@@ -137,6 +137,7 @@ def display_data(graphData):
     global pre_offset
     global post_offset
     global split_point
+    global stats
 
     graphData = np.delete(graphData, len(graphData), 1)
 
@@ -164,6 +165,8 @@ def display_data(graphData):
         plt.ylim(min_intensity, max_intensity)
         plt.xlabel("time (seconds)")
         plt.ylabel("normalized intensity")
+        plt.axvline(stats['FWHM_Left_Index'][i])
+        plt.axvline(stats['FWHM_Right_Index'][i])
         plt.savefig("plot" + str(i), format="png")
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -198,7 +201,6 @@ if __name__ == '__main__':
     for i, path in enumerate(pre_image_paths):
         if not path.startswith("."):
             validPaths.append(pre_image_paths[i])
-    print(validPaths)
     pre_image_paths = validPaths
     pre_image_paths = natsorted(pre_image_paths)
 
@@ -302,12 +304,10 @@ if __name__ == '__main__':
     for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
         post_offset.append(i)
 
+    stats = anal.getStats(nucDat, len(masks), pre_offset + post_offset, graphData, dead_cell)
+
     # stitch together all of the masks
     display_data(graphData)
-
-    print("Test:")
-    print(pre_offset + post_offset)
-    anal.getStats(nucDat, len(masks), pre_offset + post_offset, graphData, dead_cell)
 
     end_time = time.time()
     execution_time = end_time - start_time
