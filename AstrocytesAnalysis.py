@@ -163,10 +163,11 @@ def display_data(graphData):
                 title_text = "Dead Cell"
         plt.title(title_text)
         plt.ylim(min_intensity, max_intensity)
-        plt.xlabel("time (seconds)")
+        plt.xlabel("Frame #")
         plt.ylabel("normalized intensity")
-        plt.axvline(stats['FWHM_Left_Index'][i])
-        plt.axvline(stats['FWHM_Right_Index'][i])
+        plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
+        plt.axvline(stats['FWHM_Right_Index'][i], linestyle="dashed")
+        plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
         plt.savefig("plot" + str(i), format="png")
 
 def create_circular_mask(h, w, center=None, radius=None):
