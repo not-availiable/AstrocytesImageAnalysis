@@ -1,11 +1,12 @@
+# Imports
 import os
 import sys
 import subprocess
 import json
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog)
 from PyQt5.QtGui import QPixmap, QIcon, QFont
-from PyQt5.QtCore import QTimer, QEvent, QThread, Qt
-
+from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess
+# AstrocyteAnalysis subprocess
 class WorkerThread(QThread):
     def __init__(self):
         super().__init__()
@@ -23,6 +24,7 @@ class MainWindow(QMainWindow):
 
         # Create a Graphics View widget
         self.graphics_view = QGraphicsView(self)
+        self.graphics_view.setMinimumSize(800, 600)
         self.graphics_scene = QGraphicsScene(self)
         self.graphics_view.setScene(self.graphics_scene)
 
@@ -102,6 +104,9 @@ class MainWindow(QMainWindow):
 
         # Set the style of the GUI
         self.set_style()
+
+        # Create CZI conversion process
+        self.czi_conversion_process = QProcess(self)
 
     def set_style(self):
         style = """
@@ -194,6 +199,17 @@ class MainWindow(QMainWindow):
         load_post_dir_action.triggered.connect(self.load_post_dir)
         file_menu.addAction(load_post_dir_action)
 
+        czi_menu = menubar.addMenu('&CZI')
+        
+        czi_to_tiff_action = QAction('Convert CZI to TIFF with timestamps', self)
+        czi_to_tiff_action.triggered.connect(self.convert_czi_to_tiff)
+        czi_menu.addAction(czi_to_tiff_action)
+
+        rename_tiff_action = QAction('Rename TIFFs using CZI', self)
+        rename_tiff_action.triggered.connect(self.rename_tiffs)
+        rename_tiff_action.setDisabled(True)
+        czi_menu.addAction(rename_tiff_action)
+
         exit_action = QAction('Exit', self)
         exit_action.setShortcut('Ctrl+Q')
         exit_action.triggered.connect(self.close)
@@ -206,7 +222,7 @@ class MainWindow(QMainWindow):
 
         self.worker_thread.start()
 
-        self.progress_timer.start(250)  # every 0.25 second
+        self.progress_timer.start(100)  # every 0.1 second
 
     def stop_analysis(self):
         self.worker_thread.stop()
@@ -321,6 +337,24 @@ class MainWindow(QMainWindow):
             message_box.setText("The requested image does not exist.")
             message_box.setStyleSheet("QMessageBox { background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF; }")
             message_box.exec_()
+
+    def convert_czi_to_tiff(self):
+        czi_file, ok1 = QInputDialog.getText(self, 'Input Dialog', 'Enter your CZI file path:')
+        output_dir, ok2 = QInputDialog.getText(self, 'Input Dialog', 'Enter your output directory:')
+        
+        if ok1 and ok2:
+            if not os.path.exists(czi_file):
+                QMessageBox.critical(self, "Error", f"The CZI file at path {czi_file} does not exist.")
+                return
+
+            if not os.path.exists(output_dir):
+                QMessageBox.critical(self, "Error", f"The output directory at path {output_dir} does not exist.")
+                return
+
+            self.czi_conversion_process.start('python', ['czitotiff.py', czi_file, output_dir])
+    
+    def rename_tiffs(self):
+        pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
