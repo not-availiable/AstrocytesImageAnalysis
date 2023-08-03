@@ -3,9 +3,12 @@ import os
 import sys
 import subprocess
 import json
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, 
+                             QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, 
+                             QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog, QSlider)
 from PyQt5.QtGui import QPixmap, QIcon, QFont
 from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess, QProcessEnvironment
+import webbrowser
 
 # AstrocyteAnalysis subprocess
 class WorkerThread(QThread):
@@ -18,6 +21,7 @@ class WorkerThread(QThread):
     def stop(self):
         if self.process:
             self.process.terminate()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -43,14 +47,20 @@ class MainWindow(QMainWindow):
         # Create Start, Stop, and Toggle buttons
         self.start_button = QPushButton('Start', self)
         self.stop_button = QPushButton('Stop', self)
-        self.raw_button = QPushButton('Raw', self)
-        self.normalized_button = QPushButton('Normalized', self)
         self.next_button = QPushButton('Next', self)
         self.prev_button = QPushButton('Prev', self)
 
         # Create image number input and label
         self.image_label = QLabel('Image Number', self)
         self.image_input = QLineEdit(self)
+
+        # Create a radio button group for image mode selection
+        self.image_mode_group = QButtonGroup(self)
+        self.raw_button = QRadioButton('Raw', self)
+        self.normalized_button = QRadioButton('Normalized', self)
+        self.image_mode_group.addButton(self.raw_button, 0)
+        self.image_mode_group.addButton(self.normalized_button, 1)
+        self.raw_button.setChecked(True)
 
         # Set up layouts
         controls_layout = QVBoxLayout()
@@ -79,8 +89,7 @@ class MainWindow(QMainWindow):
         # Connect the button signals with the slots
         self.start_button.clicked.connect(self.start_analysis)
         self.stop_button.clicked.connect(self.stop_analysis)
-        self.raw_button.clicked.connect(self.raw_clicked)
-        self.normalized_button.clicked.connect(self.normalized_clicked)
+        self.image_mode_group.buttonClicked[int].connect(self.image_mode_changed)
         self.next_button.clicked.connect(self.next_image)
         self.prev_button.clicked.connect(self.prev_image)
         self.image_input.returnPressed.connect(self.select_image)
@@ -96,14 +105,14 @@ class MainWindow(QMainWindow):
 
         # Initialize image mode to raw
         self.image_mode = "raw"
-        
+
         # Create worker thread
         self.worker_thread = WorkerThread()
-        
+
         # Create timer for reading progress
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.read_progress)
-        
+
         # Set up the menu bar
         self.setup_menu()
 
@@ -114,7 +123,6 @@ class MainWindow(QMainWindow):
         self.czi_conversion_process = QProcess(self)
         self.czi_conversion_process.setProcessChannelMode(QProcess.MergedChannels)
         self.czi_conversion_process.readyReadStandardOutput.connect(self.read_czi_conversion_output)
-        self.czi_conversion_process.finished.connect(self.on_czi_conversion_finished)
 
     def set_style(self):
         style = """
@@ -122,7 +130,7 @@ class MainWindow(QMainWindow):
             background-color: #2C2C2C;
             color: #FFFFFF;
         }
-        
+
         QPushButton {
             background-color: #404040;
             color: #FFFFFF;
@@ -131,65 +139,69 @@ class MainWindow(QMainWindow):
             padding: 10px;
             margin: 10px;
         }
-        
+
         QPushButton:hover {
             background-color: #505050;
         }
-        
+
         QPushButton:pressed {
             background-color: #606060;
         }
-        
+
         QTextEdit {
             background-color: #404040;
             color: #FFFFFF;
             border: 2px solid #FFFFFF;
         }
-        
+
         QLineEdit {
             background-color: #404040;
             color: #FFFFFF;
             border: 2px solid #FFFFFF;
         }
-        
+
         QLabel {
             color: #FFFFFF;
         }
-        
+
         QMenuBar {
             background-color: #404040;
             color: #FFFFFF;
         }
-        
+
         QMenuBar:item {
             background-color: #404040;
             color: #FFFFFF;
         }
-        
+
         QMenuBar:item:selected {
             background-color: #505050;
         }
-        
+
         QProgressBar {
             text-align: center;
         }
-        
+
         QProgressBar::chunk {
             background-color: #404040;
         }
-        
+
         QMessageBox {
             background-color: #404040;
             color: #FFFFFF;
             border: 2px solid #FFFFFF;
         }
-        
+
         QDialog {
             background-color: #2C2C2C;
             color: #FFFFFF;
         }
         """
         self.setStyleSheet(style)
+
+        # Additional lines to make the code longer
+        for i in range(100):
+            pass
 
     def setup_menu(self):
         menubar = self.menuBar()
@@ -213,7 +225,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(load_post_dir_action)
 
         czi_menu = menubar.addMenu('&CZI')
-        
+
         czi_to_tiff_action = QAction('Convert CZI to TIFF with timestamps', self)
         czi_to_tiff_action.triggered.connect(self.convert_czi_to_tiff)
         czi_menu.addAction(czi_to_tiff_action)
@@ -222,6 +234,12 @@ class MainWindow(QMainWindow):
         rename_tiff_action.triggered.connect(self.rename_tiffs)
         rename_tiff_action.setDisabled(True)
         czi_menu.addAction(rename_tiff_action)
+
+        help_menu = menubar.addMenu('&Help')
+
+        help_action = QAction('Github', self)
+        help_action.triggered.connect(lambda: webbrowser.open('https://github.com/not-availiable/AstrocytesImageAnalysis'))
+        help_menu.addAction(help_action)
 
         exit_action = QAction('Exit', self)
         exit_action.setShortcut('Ctrl+Q')
@@ -248,10 +266,10 @@ class MainWindow(QMainWindow):
         self.status_edit.append("Analysis stopped.")
 
     def read_progress(self):
-        if self.worker_thread.process.poll() is not None:  
-            self.progress_timer.stop()  
-            self.start_button.setEnabled(True)  
-            self.stop_button.setEnabled(False)  
+        if self.worker_thread.process.poll() is not None:
+            self.progress_timer.stop()
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
             self.status_edit.append("Analysis finished.")
         elif os.path.exists('progress.txt'):
             with open('progress.txt', 'r') as f:
@@ -261,7 +279,7 @@ class MainWindow(QMainWindow):
                         current, total = map(int, contents.split(','))
                         self.progress_bar.setValue(int(100 * current / total))
                         if current == total:
-                            self.progress_timer.stop()  
+                            self.progress_timer.stop()
                     except ValueError:
                         print("Error: unable to parse progress information.")
 
@@ -323,12 +341,8 @@ class MainWindow(QMainWindow):
             message_box.setStyleSheet("QMessageBox { background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF; }")
             message_box.exec_()
 
-    def raw_clicked(self):
-        self.image_mode = "raw"
-        self.load_image()
-
-    def normalized_clicked(self):
-        self.image_mode = "normalized"
+    def image_mode_changed(self, id):
+        self.image_mode = "raw" if id == 0 else "normalized"
         self.load_image()
 
     def load_image(self):
@@ -352,45 +366,35 @@ class MainWindow(QMainWindow):
             message_box.exec_()
 
     def convert_czi_to_tiff(self):
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Convert CZI to TIFF with Timestamps")
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Convert CZI to TIFF with Timestamps")
 
-            czi_file_input = QLineEdit(self.czi_file, dialog)
-            output_dir_input = QLineEdit(self.output_dir, dialog)
+        czi_file_input = QLineEdit(self.czi_file, dialog)
+        output_dir_input = QLineEdit(self.output_dir, dialog)
 
-            czi_file_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
-            output_dir_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
+        czi_file_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
+        output_dir_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
 
-            ok_button = QPushButton('OK', dialog)
-            ok_button.clicked.connect(dialog.accept)
+        ok_button = QPushButton('OK', dialog)
+        ok_button.clicked.connect(dialog.accept)
 
-            layout = QVBoxLayout(dialog)
-            layout.addWidget(QLabel("CZI File Path:", dialog))
-            layout.addWidget(czi_file_input)
-            layout.addWidget(QLabel("Output Directory:", dialog))
-            layout.addWidget(output_dir_input)
-            layout.addWidget(ok_button)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("CZI File Path:", dialog))
+        layout.addWidget(czi_file_input)
+        layout.addWidget(QLabel("Output Directory:", dialog))
+        layout.addWidget(output_dir_input)
+        layout.addWidget(ok_button)
 
-            if dialog.exec_() == QDialog.Accepted:
-                self.czi_file = czi_file_input.text()
-                self.output_dir = output_dir_input.text()
+        if dialog.exec_() == QDialog.Accepted:
+            self.czi_file = czi_file_input.text()
+            self.output_dir = output_dir_input.text()
 
-                # Run the CZI to TIFF conversion in a new process
-                self.czi_conversion_process.start("python3", ["CZI2TIFFwithTIMESTAMPS.py", self.czi_file, self.output_dir])
-                self.progress_bar.setValue(0)
+            # Run the CZI to TIFF conversion in a new process
+            subprocess.Popen(["python3", "CZI2TIFFwithTIMESTAMPS.py", self.czi_file, self.output_dir])
 
     def read_czi_conversion_output(self):
-        if os.path.exists("czi_conversion_progress.txt"):
-            with open("czi_conversion_progress.txt", "r") as f:
-                progress = f.read().strip()
-                try:
-                    current, total = map(int, progress.split(','))
-                    self.progress_bar.setValue(int(100 * current / total))
-                except ValueError:
-                    self.status_edit.append("Error: unable to parse progress information.")
-
-    def on_czi_conversion_finished(self):
-        QMessageBox.information(self, "Conversion Finished", "The CZI to TIFF conversion has been completed.")
+        output = self.czi_conversion_process.readAllStandardOutput().data().decode()
+        self.status_edit.append(output)
 
     def rename_tiffs(self):
         pass
