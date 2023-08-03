@@ -5,6 +5,7 @@ import tifffile
 import time
 import cv2
 import dask
+from dask.diagnostics import ProgressBar
 
 def extract_timestamps_from_metadata(metadata_xml):
     root = ET.fromstring(metadata_xml)
@@ -38,12 +39,22 @@ def convert_czi_to_tiff(czi_file_path, output_dir):
             timestamp = timestamps[i].replace(":", "_").replace(".", "_")
             tasks.append(worker(slice_img, timestamp, i, output_dir))
 
-        # Execute all tasks
-        dask.compute(*tasks)
+        total = len(tasks)
+        completed = 0
+
+        # Use dask's progress bar to show progress
+        with ProgressBar():
+            for task in dask.compute(*tasks):
+                completed += 1
+                # Update progress to a file
+                with open("czi_conversion_progress.txt", "w") as f:
+                    f.write(f"{completed},{total}")  # current,total
 
 if __name__ == "__main__":
-    czi_file = "/media/krishna/OS/OPALSdata/czi2tiff/czi/Cell_91_Pre.czi"
-    output_dir = "/media/krishna/OS/OPALSdata/czi2tiff/output"
+    import sys
+
+    czi_file = sys.argv[1]
+    output_dir = sys.argv[2]
 
     start_time = time.time()
     convert_czi_to_tiff(czi_file, output_dir)
