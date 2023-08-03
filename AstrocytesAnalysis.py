@@ -1,20 +1,19 @@
 import os
 import math
 import numpy as np
-import numpy.ma as ma
 from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
 import time
 import json
 from natsort import natsorted
-from tqdm import tqdm
 from multiprocessing import Pool
 import AstrocyteAStar as astar
 import FullAnalysis as anal
 
-#start timer to measure how long code takes to execute
-start_time=time.time()
+# start timer to measure how long code takes to execute
+start_time = time.time()
+
 
 def load_path(file):
     f = open(file)
@@ -22,14 +21,16 @@ def load_path(file):
     f.close()
     return path
 
+
 def get_center_location(o):
-    #takes average
+    # takes average
     return o[:, 0].mean(), o[:, 1].mean()
+
 
 def generate_masks():
     global dead_cell
     global close_cell_count
-    
+
     i = 0
     for o in nucOutlines:
         # nuclei
@@ -37,44 +38,44 @@ def generate_masks():
         centerX, centerY = get_center_location(o)
         plt.annotate(str(i), (centerX, centerY), color="white")
 
-        plt.plot(o[:,0], o[:,1], color='r')
+        plt.plot(o[:, 0], o[:, 1], color='r')
 
-        #get standard deviation
-        stdX = np.std(o[:,0])
-        stdY = np.std(o[:,1])
+        # get standard deviation
+        stdX = np.std(o[:, 0])
+        stdY = np.std(o[:, 1])
         stdMax = max(stdX, stdY)
 
         # cytoplasm
         # see if there is a cytoplasm that is close enough to a nucleus to use
         hasCloseCytoplasm = False
         closeMaskId = 1
-        for c in cytoOutlines: 
+        for c in cytoOutlines:
             if i == 0:
-                plt.plot(c[:,0], c[:,1], color='r') 
+                plt.plot(c[:, 0], c[:, 1], color='r')
             cytoCenterX, cytoCenterY = get_center_location(c)
             if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
                 hasCloseCytoplasm = True
                 break
-            closeMaskId+=1
+            closeMaskId += 1
 
         # use only the relavant part of the cytoplasm mask 
         mask = cytoWholeMask == closeMaskId
         # use original circle method if there are no valid cytoplasm masks
         if not hasCloseCytoplasm:
-            #plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
+            # plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
             h, w = samplingImage.shape[:2]
             mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
-        
+
         # remove the nucleus from the mask
         mask[nucWholeMask] = 0
         masks.append(mask)
-        i+=1
-    
+        i += 1
+
     # fullMask = np.zeros(nucWholeMask.shape)
     # for mask in masks:
     #     fullMask = np.add(fullMask, mask)
     # fullMask = fullMask > 0
-    
+
     # samplingImage[~fullMask] = 0
     plt.imshow(samplingImage)
     plt.savefig("masks_pre", format="png")
@@ -88,14 +89,16 @@ def generate_masks():
     close_cell_count = input()
     close_cell_count = int(close_cell_count)
 
+
 def save_masks(masks):
     combined_mask = np.empty(())
     for mask in masks:
         combined_mask = np.dstack(combined_mask, mask)
-    np.save("masks.npy",combined_mask)
+    np.save("masks.npy", combined_mask)
+
 
 def sample_data(filedata):
-    #global graphData
+    # global graphData
     global first_image_sample
     global first_image_normalized_intensities
 
@@ -116,7 +119,7 @@ def sample_data(filedata):
         temp.append(normalized_intensity)
         if first_image_sample:
             first_image_normalized_intensities.append(normalized_intensity)
-    
+
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
     for value in temp:
@@ -124,11 +127,11 @@ def sample_data(filedata):
             min_intensity = value
         if value > max_intensity:
             max_intensity = value
-    
 
     print("Finished processing frame: " + str(insert_index))
     first_image_sample = False
     return temp, insert_index, min_intensity, max_intensity
+
 
 def display_data(graphData):
     global connection_list
@@ -162,7 +165,7 @@ def display_data(graphData):
             case 3:
                 title_text = "Dead Cell"
         plt.title(title_text)
-        plt.ylim(min_intensity, max_intensity)
+        plt.ylim(min_intensity, max_intensity+.05)
         plt.xlabel("Frame #")
         plt.ylabel("normalized intensity")
         plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
@@ -170,10 +173,11 @@ def display_data(graphData):
         plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
         plt.savefig("plot" + str(i), format="png")
 
+
 def create_circular_mask(h, w, center=None, radius=None):
-    if center is None: # use the middle of the image
+    if center is None:  # use the middle of the image
         center = (int(w/2), int(h/2))
-    if radius is None: # use the smallest distance between the center and image walls
+    if radius is None:  # use the smallest distance between the center and image walls
         radius = min(center[0], center[1], w-center[0], h-center[1])
 
     Y, X = np.ogrid[:h, :w]
@@ -181,6 +185,7 @@ def create_circular_mask(h, w, center=None, radius=None):
 
     mask = dist_from_center <= radius
     return mask
+
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
@@ -191,8 +196,8 @@ if __name__ == '__main__':
         config = json.load(f)
 
     # for quick running a single image
-    #nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
-    #cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
+    # nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
+    # cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
 
     pre_dir_path = config["pre_directory_location"]
     post_dir_path = config["post_directory_location"]
@@ -213,7 +218,7 @@ if __name__ == '__main__':
     post_image_paths = validPaths
     post_image_paths = natsorted(post_image_paths)
 
-    #print(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
+    # print(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
 
     samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
     first_image_sample = True
@@ -223,12 +228,12 @@ if __name__ == '__main__':
     max_intensity = 1
     min_intensities = []
     max_intensities = []
-    
+
     dead_cell = 0
     close_cell_count = 0
 
     # for quick running a single image
-    #samplingImage = plt.imread(load_path("imgLocation.txt"))
+    # samplingImage = plt.imread(load_path("imgLocation.txt"))
 
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
@@ -239,22 +244,22 @@ if __name__ == '__main__':
     cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
 
     # plot image with outlines overlaid in red
-    #nucOutlines = utils.outlines_list(nucDat['masks'])
+    # nucOutlines = utils.outlines_list(nucDat['masks'])
     nucOutlines = utils.outlines_list(nucDat)
-    #cytoOutlines = utils.outlines_list(cytoDat['masks'])
+    # cytoOutlines = utils.outlines_list(cytoDat['masks'])
     cytoOutlines = utils.outlines_list(cytoDat)
 
     masks = []
 
-    #masks = np.load("masks.npy")
+    # masks = np.load("masks.npy")
 
     # for quick running a single image
-    #nucWholeMask = nucDat['masks']
+    # nucWholeMask = nucDat['masks']
     nucWholeMask = nucDat
     nucWholeMask = nucWholeMask > 0
 
     # for quick running a single image
-    #cytoWholeMask = cytoDat['masks']
+    # cytoWholeMask = cytoDat['masks']
     cytoWholeMask = cytoDat
 
     print("Generating Masks")
@@ -272,24 +277,24 @@ if __name__ == '__main__':
     temp, insert_index, min_intensity, max_intensity = sample_data(full_image_data[0])
     min_intensities.append(min_intensity)
     max_intensities.append(max_intensity)
-    graphData[:,insert_index] = temp
+    graphData[:, insert_index] = temp
 
     i = 0
     for image_path in pre_image_paths:
         if i != insert_index:
             full_image_data.append((os.path.join(pre_dir_path, image_path), i))
-        i+=1
+        i += 1
 
     for image_path in post_image_paths:
         full_image_data.append((os.path.join(post_dir_path, image_path), i))
-        i+=1
+        i += 1
 
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
         temp, insert_index, min_intensity, max_intensity = result
         min_intensities.append(min_intensity)
         max_intensities.append(max_intensity)
-        graphData[:,insert_index] = temp
+        graphData[:, insert_index] = temp
     p.close()
 
     min_intensity = np.min(min_intensities)
