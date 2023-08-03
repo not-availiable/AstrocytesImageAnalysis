@@ -3,9 +3,10 @@ import os
 import sys
 import subprocess
 import json
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog)
 from PyQt5.QtGui import QPixmap, QIcon, QFont
-from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess
+from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess, QProcessEnvironment
+
 # AstrocyteAnalysis subprocess
 class WorkerThread(QThread):
     def __init__(self):
@@ -21,6 +22,10 @@ class WorkerThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
+
+        # Initialize CZI file and output directory
+        self.czi_file = ""
+        self.output_dir = ""
 
         # Create a Graphics View widget
         self.graphics_view = QGraphicsView(self)
@@ -107,6 +112,9 @@ class MainWindow(QMainWindow):
 
         # Create CZI conversion process
         self.czi_conversion_process = QProcess(self)
+        self.czi_conversion_process.setProcessChannelMode(QProcess.MergedChannels)
+        self.czi_conversion_process.readyReadStandardOutput.connect(self.read_czi_conversion_output)
+        self.czi_conversion_process.finished.connect(self.on_czi_conversion_finished)
 
     def set_style(self):
         style = """
@@ -174,6 +182,11 @@ class MainWindow(QMainWindow):
             background-color: #404040;
             color: #FFFFFF;
             border: 2px solid #FFFFFF;
+        }
+        
+        QDialog {
+            background-color: #2C2C2C;
+            color: #FFFFFF;
         }
         """
         self.setStyleSheet(style)
@@ -339,20 +352,46 @@ class MainWindow(QMainWindow):
             message_box.exec_()
 
     def convert_czi_to_tiff(self):
-        czi_file, ok1 = QInputDialog.getText(self, 'Input Dialog', 'Enter your CZI file path:')
-        output_dir, ok2 = QInputDialog.getText(self, 'Input Dialog', 'Enter your output directory:')
-        
-        if ok1 and ok2:
-            if not os.path.exists(czi_file):
-                QMessageBox.critical(self, "Error", f"The CZI file at path {czi_file} does not exist.")
-                return
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Convert CZI to TIFF with Timestamps")
 
-            if not os.path.exists(output_dir):
-                QMessageBox.critical(self, "Error", f"The output directory at path {output_dir} does not exist.")
-                return
+            czi_file_input = QLineEdit(self.czi_file, dialog)
+            output_dir_input = QLineEdit(self.output_dir, dialog)
 
-            self.czi_conversion_process.start('python', ['czitotiff.py', czi_file, output_dir])
-    
+            czi_file_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
+            output_dir_input.setStyleSheet("background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF;")
+
+            ok_button = QPushButton('OK', dialog)
+            ok_button.clicked.connect(dialog.accept)
+
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel("CZI File Path:", dialog))
+            layout.addWidget(czi_file_input)
+            layout.addWidget(QLabel("Output Directory:", dialog))
+            layout.addWidget(output_dir_input)
+            layout.addWidget(ok_button)
+
+            if dialog.exec_() == QDialog.Accepted:
+                self.czi_file = czi_file_input.text()
+                self.output_dir = output_dir_input.text()
+
+                # Run the CZI to TIFF conversion in a new process
+                self.czi_conversion_process.start("python3", ["CZI2TIFFwithTIMESTAMPS.py", self.czi_file, self.output_dir])
+                self.progress_bar.setValue(0)
+
+    def read_czi_conversion_output(self):
+        if os.path.exists("czi_conversion_progress.txt"):
+            with open("czi_conversion_progress.txt", "r") as f:
+                progress = f.read().strip()
+                try:
+                    current, total = map(int, progress.split(','))
+                    self.progress_bar.setValue(int(100 * current / total))
+                except ValueError:
+                    self.status_edit.append("Error: unable to parse progress information.")
+
+    def on_czi_conversion_finished(self):
+        QMessageBox.information(self, "Conversion Finished", "The CZI to TIFF conversion has been completed.")
+
     def rename_tiffs(self):
         pass
 
