@@ -30,12 +30,14 @@ def get_center_location(o):
 def generate_masks():
     global dead_cell
     global close_cell_count
+    global nuclei_centers
 
     i = 0
     for o in nucOutlines:
         # nuclei
         # get average x and y
         centerX, centerY = get_center_location(o)
+        nuclei_centers.append((centerX, centerY))
         plt.annotate(str(i), (centerX, centerY), color="white")
 
         plt.plot(o[:, 0], o[:, 1], color='r')
@@ -78,16 +80,16 @@ def generate_masks():
 
     # samplingImage[~fullMask] = 0
     plt.imshow(samplingImage)
-    plt.savefig("masks_pre", format="png")
+    plt.savefig("masks_pre.png", format="png")
     post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
     plt.imshow(post_image)
-    plt.savefig("masks_post", format="png")
-    print("please open and compare the two mask images that were just generated in the folder and type the number of the dead cell")
-    dead_cell = input()
-    dead_cell = int(dead_cell)
-    print("please type the number of cells that are close to the dead cell")
-    close_cell_count = input()
-    close_cell_count = int(close_cell_count)
+    plt.savefig("masks_post.png", format="png")
+    # print("please open and compare the two mask images that were just generated in the folder and type the number of the dead cell")
+    # dead_cell = input()
+    # dead_cell = int(dead_cell)
+    # print("please type the number of cells that are close to the dead cell")
+    # close_cell_count = input()
+    # close_cell_count = int(close_cell_count)
 
 
 def save_masks(masks):
@@ -171,7 +173,7 @@ def display_data(graphData):
         plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
         plt.axvline(stats['FWHM_Right_Index'][i], linestyle="dashed")
         plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
-        plt.savefig("plot" + str(i), format="png")
+        plt.savefig("plot" + str(i) + ".png", format="png")
 
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -220,7 +222,8 @@ if __name__ == '__main__':
 
     # print(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
 
-    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
+    sampling_image_path = os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1])
+    samplingImage = plt.imread(sampling_image_path)
     first_image_sample = True
     first_image_normalized_intensities = []
 
@@ -231,6 +234,7 @@ if __name__ == '__main__':
 
     dead_cell = 0
     close_cell_count = 0
+    nuclei_centers = []
 
     # for quick running a single image
     # samplingImage = plt.imread(load_path("imgLocation.txt"))
@@ -239,9 +243,9 @@ if __name__ == '__main__':
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
     print("Detecting Nuclei")
-    nucDat = nucModel.eval(samplingImage, channels=[2,0])[0]
+    nucDat = nucModel.eval(samplingImage, channels=[2, 0])[0]
     print("Detecting Cytoplasm")
-    cytoDat = cytoModel.eval(samplingImage, channels=[2,0])[0]
+    cytoDat = cytoModel.eval(samplingImage, channels=[2, 0])[0]
 
     # plot image with outlines overlaid in red
     # nucOutlines = utils.outlines_list(nucDat['masks'])
@@ -265,11 +269,9 @@ if __name__ == '__main__':
     print("Generating Masks")
     generate_masks()
 
-    connection_list = astar.runAStarAlgorithm(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]), nucDat, dead_cell, close_cell_count)
-
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
-    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]), len(pre_image_paths)-1)]
+    full_image_data = [(sampling_image_path, len(pre_image_paths)-1)]
 
     temp = []
     insert_index = len(pre_image_paths) - 1
@@ -289,6 +291,8 @@ if __name__ == '__main__':
         full_image_data.append((os.path.join(post_dir_path, image_path), i))
         i += 1
 
+    full_image_data.pop(0)
+
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
         temp, insert_index, min_intensity, max_intensity = result
@@ -301,6 +305,31 @@ if __name__ == '__main__':
     max_intensity = np.max(max_intensities)
 
     split_point = len(pre_image_paths)
+
+    min_roi_intensity = 0
+    min_roi_intensity_index = 0
+    for i, intensities_list in enumerate(graphData):
+        if i == 0:
+            min_roi_intensity = np.min(intensities_list)
+        else:
+            current_min_roi_intensity = np.min(intensities_list)
+            if min_roi_intensity > current_min_roi_intensity:
+                min_roi_intensity = current_min_roi_intensity
+                min_roi_intensity_index = i
+
+    dead_cell = min_roi_intensity_index
+
+    dead_cell_center = nuclei_centers[dead_cell]
+    for i, center in enumerate(nuclei_centers):
+        print(math.dist(center, dead_cell_center))
+        if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
+            close_cell_count += 1
+
+    print("Close cell count " + str(close_cell_count))
+
+    connection_list = astar.runAStarAlgorithm(sampling_image_path,
+                                              nucDat, dead_cell,
+                                              close_cell_count)
 
     pre_offset = []
     for i in range(0, len(pre_image_paths)):
