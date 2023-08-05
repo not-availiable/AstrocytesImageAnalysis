@@ -60,11 +60,10 @@ def generate_masks():
                 break
             closeMaskId += 1
 
-        # use only the relavant part of the cytoplasm mask 
+        # use only the relavant part of the cytoplasm mask
         mask = cytoWholeMask == closeMaskId
         # use original circle method if there are no valid cytoplasm masks
         if not hasCloseCytoplasm:
-            # plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
             h, w = samplingImage.shape[:2]
             mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
 
@@ -73,23 +72,11 @@ def generate_masks():
         masks.append(mask)
         i += 1
 
-    # fullMask = np.zeros(nucWholeMask.shape)
-    # for mask in masks:
-    #     fullMask = np.add(fullMask, mask)
-    # fullMask = fullMask > 0
-
-    # samplingImage[~fullMask] = 0
     plt.imshow(samplingImage)
     plt.savefig("masks_pre.png", format="png")
     post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
     plt.imshow(post_image)
     plt.savefig("masks_post.png", format="png")
-    # print("please open and compare the two mask images that were just generated in the folder and type the number of the dead cell")
-    # dead_cell = input()
-    # dead_cell = int(dead_cell)
-    # print("please type the number of cells that are close to the dead cell")
-    # close_cell_count = input()
-    # close_cell_count = int(close_cell_count)
 
 
 def save_masks(masks):
@@ -112,7 +99,7 @@ def sample_data(filedata):
     samplingImage = plt.imread(filepath)
 
     temp = []
-    # min_intensity = np.min(samplingImage)
+    # the bg_intensity is the mean of all pixels with a z_score less than 1.21
     bg_intensity = np.mean(samplingImage[np.where((samplingImage - np.mean(samplingImage)) / np.std(samplingImage) < 1.21)])
 
     for mask in masks:
@@ -122,6 +109,7 @@ def sample_data(filedata):
         if first_image_sample:
             first_image_normalized_intensities.append(normalized_intensity)
 
+    # divide intensities by the original intensities
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
     for value in temp:
@@ -150,10 +138,6 @@ def display_data(graphData):
         plt.clf()
         # pre graph
         plt.plot(pre_offset, graphData[i][:split_point], color="blue")
-        # connecting line
-        # x_points = np.array([(split_point-1) * 3, split_point * 3])
-        # y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-        # plt.plot(x_points, y_points, color="green")
         # post graph
         plt.plot(post_offset, graphData[i][split_point-1:], color="red")
         title_text = ""
@@ -197,13 +181,12 @@ if __name__ == '__main__':
     with open("config.json") as f:
         config = json.load(f)
 
-    # for quick running a single image
-    # nucDat = np.load(load_path("nucleiMaskLocation.txt"), allow_pickle=True).item()
-    # cytoDat = np.load(load_path("cytoMaskLocation.txt"), allow_pickle=True).item()
-
     pre_dir_path = config["pre_directory_location"]
     post_dir_path = config["post_directory_location"]
 
+    # get all of the filepaths from the pre and post image folders
+    # ignoring hidden folders to fix DS_Store issue
+    # natsorted is necessary because the files are not sorted in the correct order by default
     pre_image_paths = os.listdir(pre_dir_path)
     validPaths = []
     for i, path in enumerate(pre_image_paths):
@@ -220,10 +203,10 @@ if __name__ == '__main__':
     post_image_paths = validPaths
     post_image_paths = natsorted(post_image_paths)
 
-    # print(os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1]))
-
-    sampling_image_path = os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1])
-    samplingImage = plt.imread(sampling_image_path)
+    # variable definitions
+    # first sampling image is the image that every other image will be normalized in relation to
+    first_sampling_image_path = os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1])
+    samplingImage = plt.imread(first_sampling_image_path)
     first_image_sample = True
     first_image_normalized_intensities = []
 
@@ -236,9 +219,6 @@ if __name__ == '__main__':
     close_cell_count = 0
     nuclei_centers = []
 
-    # for quick running a single image
-    # samplingImage = plt.imread(load_path("imgLocation.txt"))
-
     nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
@@ -248,22 +228,14 @@ if __name__ == '__main__':
     cytoDat = cytoModel.eval(samplingImage, channels=[2, 0])[0]
 
     # plot image with outlines overlaid in red
-    # nucOutlines = utils.outlines_list(nucDat['masks'])
     nucOutlines = utils.outlines_list(nucDat)
-    # cytoOutlines = utils.outlines_list(cytoDat['masks'])
     cytoOutlines = utils.outlines_list(cytoDat)
 
     masks = []
 
-    # masks = np.load("masks.npy")
-
-    # for quick running a single image
-    # nucWholeMask = nucDat['masks']
     nucWholeMask = nucDat
     nucWholeMask = nucWholeMask > 0
 
-    # for quick running a single image
-    # cytoWholeMask = cytoDat['masks']
     cytoWholeMask = cytoDat
 
     print("Generating Masks")
@@ -271,8 +243,9 @@ if __name__ == '__main__':
 
     graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
-    full_image_data = [(sampling_image_path, len(pre_image_paths)-1)]
+    full_image_data = [(first_sampling_image_path, len(pre_image_paths)-1)]
 
+    # run this image outside of the multiprocessing to gurantee that it happens first
     temp = []
     insert_index = len(pre_image_paths) - 1
 
@@ -281,6 +254,8 @@ if __name__ == '__main__':
     max_intensities.append(max_intensity)
     graphData[:, insert_index] = temp
 
+    # add every path but the one that was just sampled
+    # then remove that first path so it is not sampled twice
     i = 0
     for image_path in pre_image_paths:
         if i != insert_index:
@@ -293,6 +268,7 @@ if __name__ == '__main__':
 
     full_image_data.pop(0)
 
+    # sample all of the data using multiprocessing
     p = Pool(16)
     for result in p.map(sample_data, full_image_data):
         temp, insert_index, min_intensity, max_intensity = result
@@ -306,6 +282,8 @@ if __name__ == '__main__':
 
     split_point = len(pre_image_paths)
 
+    # find the dead cell and the close cells automatically
+    # can now run the code overnight because there are no prompts
     min_roi_intensity = 0
     min_roi_intensity_index = 0
     for i, intensities_list in enumerate(graphData):
@@ -319,18 +297,21 @@ if __name__ == '__main__':
 
     dead_cell = min_roi_intensity_index
 
+    print("Dead Cell: " + str(dead_cell))
+
     dead_cell_center = nuclei_centers[dead_cell]
     for i, center in enumerate(nuclei_centers):
         print(math.dist(center, dead_cell_center))
         if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
             close_cell_count += 1
 
-    print("Close cell count " + str(close_cell_count))
+    print("Close Cell Count: " + str(close_cell_count))
 
-    connection_list = astar.runAStarAlgorithm(sampling_image_path,
+    # get connections from astar algorithm
+    connection_list = astar.runAStarAlgorithm(first_sampling_image_path,
                                               nucDat, dead_cell,
                                               close_cell_count)
-
+    # offset the pre and post image graphs so they line up
     pre_offset = []
     for i in range(0, len(pre_image_paths)):
         pre_offset.append(i)
@@ -339,9 +320,10 @@ if __name__ == '__main__':
     for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
         post_offset.append(i)
 
+    # create the csv and pass fwhm and max to display_data
     stats = anal.getStats(nucDat, len(masks), pre_offset + post_offset, graphData, dead_cell)
 
-    # stitch together all of the masks
+    # create all of the graphs
     display_data(graphData)
 
     end_time = time.time()
