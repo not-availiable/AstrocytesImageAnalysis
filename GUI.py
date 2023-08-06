@@ -118,6 +118,8 @@ class MainWindow(QMainWindow):
 
         # Set the style of the GUI
         self.set_style()
+        self.raw_button.setStyleSheet("background-color: gray; color: white;")
+        self.normalized_button.setStyleSheet("background-color: gray; color: white;")
 
     DARK_STYLE = """
     QMainWindow {
