@@ -309,8 +309,8 @@ if __name__ == '__main__':
 
     # get connections from astar algorithm
     connection_list = astar.run_astar_algorithm(first_sampling_image_path,
-                                              nuc_dat, dead_cell,
-                                              close_cell_count)
+                                                nuc_dat, dead_cell,
+                                                close_cell_count)
     # offset the pre and post image graphs so they line up
     pre_offset = []
     for i in range(0, len(pre_image_paths)):

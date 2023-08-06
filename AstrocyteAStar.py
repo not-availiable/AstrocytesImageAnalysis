@@ -13,8 +13,10 @@ SIZE = 576
 
 # Test of A* Algorithm using a premade array
 
+
 def is_valid(row, col):
     return 0 <= row < SIZE and 0 <= col < SIZE
+
 
 def is_unblocked(grid, row, col):
     return grid[row][col] == 1
