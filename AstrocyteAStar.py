@@ -80,7 +80,7 @@ def a_star_search(grid, src, dest, si, di):
                     cell_details[new_i][new_j]["parent_i"] = i
                     cell_details[new_i][new_j]["parent_j"] = j
                     print("The destination cell is found")
-                    connectionMap[si] = 2
+                    connection_map[si] = 2
                     return trace_path(cell_details, dest)
 
                 if not closed_list[new_i][new_j] and is_unblocked(grid, new_i, new_j):
@@ -107,7 +107,7 @@ def a_star_search(grid, src, dest, si, di):
                 if distance < min_distance:
                     min_distance = distance
                     nearest_square = (x, y)
-    connectionMap[si] = 1
+    connection_map[si] = 1
     return trace_path(cell_details, nearest_square)
 
 # Example usage:
@@ -127,19 +127,20 @@ def a_star_search(grid, src, dest, si, di):
 #     print("->", p, end=" ")
 # print()
 
+
 # Getting a test image (not being used in the model yet)
-def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount):
-    image = cv2.imread(filePathNameToTiff)
+def run_astar_algorithm(file_path_name_to_tiff, nuc_dat, shockwaved_cell, close_cell_count):
+    image = cv2.imread(file_path_name_to_tiff)
     img = np.copy(image)
     img[(img - np.mean(img)) / np.std(img) < 1.21] = 0
-    img[:,:,0] = 0
-    img[:,:,2] = 0
-    
-    nucOutlines = utils.outlines_list(nucDat)
-    nucWholeMask = nucDat
-    nucWholeMask = nucWholeMask > 0
-    
-    img[nucWholeMask==True, 1] = image[nucWholeMask==True, 1]
+    img[:, :, 0] = 0
+    img[:, :, 2] = 0
+
+    nuc_outlines = utils.outlines_list(nuc_dat)
+    nuc_whole_mask = nuc_dat
+    nuc_whole_mask = nuc_whole_mask > 0
+
+    img[nuc_whole_mask, 1] = image[nuc_whole_mask, 1]
     # plt.imshow(img)
     # plt.title("Removed Background")
     # plt.show()
@@ -150,56 +151,56 @@ def runAStarAlgorithm(filePathNameToTiff, nucDat, shockwavedCell, closeCellcount
     centers = []
     print("Removed Background")
     # plt.imshow(img)
-    for outline in nucOutlines:
-        centers.append(( int(outline[:, 1].mean()) // 4, int(outline[:, 0].mean())//4 ))
-    #     plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
+    for outline in nuc_outlines:
+        centers.append((int(outline[:, 1].mean()) // 4, int(outline[:, 0].mean())//4))
+    # plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
     # plt.show()
     print("Got Centers")
-    grid = np.copy(img)[:,:,1]
+    grid = np.copy(img)[:, :, 1]
     print("Created Grid")
-    global connectionMap
-    connectionMap = np.zeros((len(centers))) # 0 = not connected, 1 = networked, 2 = connected
+    global connection_map
+    connection_map = np.zeros((len(centers)))  # 0 = not connected, 1 = networked, 2 = connected
     paths = []
-    connectionMap[shockwavedCell] = 3
+    connection_map[shockwaved_cell] = 3
     print("Created Map")
     for i in range(len(centers)):
-        if i == shockwavedCell:
+        if i == shockwaved_cell:
             paths.append([0])
             continue
         grid[grid > 0] = 1
         start = centers[i]
-        goal = centers[shockwavedCell]
+        goal = centers[shockwaved_cell]
         print(f"Got Centers For Cell {i}")
-        path = a_star_search(grid, start, goal, i, shockwavedCell)
+        path = a_star_search(grid, start, goal, i, shockwaved_cell)
         paths.append(path)
         print(f"Got Path For Cell {i}")
         for point in path:
             x = point[0]
             y = point[1]
             grid[x][y] = 255
-        fullDistance = math.sqrt( (abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2 )
-        if (connectionMap[i] == 1):
-            connectionMap[i] = int(1.25 > len(path)/fullDistance and len(path)/fullDistance > .75)
+        full_distance = math.sqrt((abs(start[0]-goal[0]))**2 + (abs(start[1]-goal[1]))**2)
+        if (connection_map[i] == 1):
+            connection_map[i] = int(1.25 > len(path)/full_distance and len(path)/full_distance > .75)
             # print(len(path))
         print(f"Finished Cell {i}")
-        img[:,:,0] = np.copy(grid[:,:])
+        img[:, :, 0] = np.copy(grid[:, :])
         img[start[0], start[1], 2] = 255
         img[goal[0], goal[1], 2] = 255
         # plt.imshow(img)
         # plt.title(f"Cell {i} to Cell {shockwavedCell}")
         # plt.show()
     paths = np.array(paths, dtype=object)
-    distArr = []
-    for arr in paths[np.where(connectionMap == 2)]:
-        distArr.append(len(arr))
-    distArr = np.sort(distArr)
-    minDistance = distArr[closeCellcount]
-    maxDistance = max(len(arr) for arr in paths[np.where(connectionMap == 2)])
+    dist_arr = []
+    for arr in paths[np.where(connection_map == 2)]:
+        dist_arr.append(len(arr))
+    dist_arr = np.sort(dist_arr)
+    min_distance = dist_arr[close_cell_count]
+    max_distance = max(len(arr) for arr in paths[np.where(connection_map == 2)])
     for i in range(len(centers)):
-        if (connectionMap[i] == 2):
-            connectionMap[i] = int(len(paths[i]) < ((minDistance + maxDistance)//(((len(centers))//4) + 1) )) + 1
+        if (connection_map[i] == 2):
+            connection_map[i] = int(len(paths[i]) < ((min_distance + max_distance)//(((len(centers))//4) + 1) )) + 1
             # print(len(paths[i]))
-    return connectionMap
+    return connection_map
 
 # EXAMPLE:
 
