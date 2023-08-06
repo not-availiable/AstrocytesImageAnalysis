@@ -1,14 +1,12 @@
-# Imports
 import os
 import sys
 import subprocess
 import json
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, 
-                             QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, 
-                             QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog, QSlider)
-from PyQt5.QtGui import QPixmap, QIcon, QFont
-from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess, QProcessEnvironment
-import webbrowser
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget,
+                             QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene,
+                             QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog)
+from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtCore import QTimer, QEvent, QThread, Qt
 
 # AstrocyteAnalysis subprocess
 class WorkerThread(QThread):
@@ -21,7 +19,6 @@ class WorkerThread(QThread):
     def stop(self):
         if self.process:
             self.process.terminate()
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -47,6 +44,8 @@ class MainWindow(QMainWindow):
         # Create Start, Stop, and Toggle buttons
         self.start_button = QPushButton('Start', self)
         self.stop_button = QPushButton('Stop', self)
+        self.raw_button = QPushButton('Raw', self)
+        self.normalized_button = QPushButton('Normalized', self)
         self.next_button = QPushButton('Next', self)
         self.prev_button = QPushButton('Prev', self)
 
@@ -54,13 +53,14 @@ class MainWindow(QMainWindow):
         self.image_label = QLabel('Image Number', self)
         self.image_input = QLineEdit(self)
 
-        # Create a radio button group for image mode selection
+        # Set the buttons to be checkable
+        self.raw_button.setCheckable(True)
+        self.normalized_button.setCheckable(True)
+
+        # Create a button group and add the buttons to it
         self.image_mode_group = QButtonGroup(self)
-        self.raw_button = QRadioButton('Raw', self)
-        self.normalized_button = QRadioButton('Normalized', self)
-        self.image_mode_group.addButton(self.raw_button, 0)
-        self.image_mode_group.addButton(self.normalized_button, 1)
-        self.raw_button.setChecked(True)
+        self.image_mode_group.addButton(self.raw_button, 0)  # The id is 0 for the raw button
+        self.image_mode_group.addButton(self.normalized_button, 1)  # The id is 1 for the normalized button
 
         # Set up layouts
         controls_layout = QVBoxLayout()
@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
         self.image_index = 0
 
         # Initialize image mode to raw
-        self.image_mode = "raw"
+        self.raw_button.setChecked(True)
 
         # Create worker thread
         self.worker_thread = WorkerThread()
@@ -119,89 +119,168 @@ class MainWindow(QMainWindow):
         # Set the style of the GUI
         self.set_style()
 
-        # Create CZI conversion process
-        self.czi_conversion_process = QProcess(self)
-        self.czi_conversion_process.setProcessChannelMode(QProcess.MergedChannels)
-        self.czi_conversion_process.readyReadStandardOutput.connect(self.read_czi_conversion_output)
+    DARK_STYLE = """
+    QMainWindow {
+        background-color: #2C2C2C;
+        color: #FFFFFF;
+    }
+    
+    QPushButton {
+        background-color: #404040;
+        color: #FFFFFF;
+        border: 2px solid #FFFFFF;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 10px;
+    }
+    
+    QPushButton:hover {
+        background-color: #505050;
+    }
+    
+    QPushButton:pressed {
+        background-color: #606060;
+    }
+    
+    QTextEdit {
+        background-color: #404040;
+        color: #FFFFFF;
+        border: 2px solid #FFFFFF;
+    }
+    
+    QLineEdit {
+        background-color: #404040;
+        color: #FFFFFF;
+        border: 2px solid #FFFFFF;
+    }
+    
+    QLabel {
+        color: #FFFFFF;
+    }
+    
+    QMenuBar {
+        background-color: #404040;
+        color: #FFFFFF;
+    }
+    
+    QMenuBar:item {
+        background-color: #404040;
+        color: #FFFFFF;
+    }
+    
+    QMenuBar:item:selected {
+        background-color: #505050;
+    }
+    
+    QProgressBar {
+        text-align: center;
+    }
+    
+    QProgressBar::chunk {
+        background-color: #404040;
+    }
+    
+    QMessageBox {
+        background-color: #404040;
+        color: #FFFFFF;
+        border: 2px solid #FFFFFF;
+    }
+    
+    QDialog {
+        background-color: #2C2C2C;
+        color: #FFFFFF;
+    }
+    """
+
+    LIGHT_STYLE = """
+    QMainWindow {
+        background-color: #EFEFEF;
+        color: #333;
+    }
+    
+    QPushButton {
+        background-color: #DDD;
+        color: #333;
+        border: 2px solid #AAA;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 10px;
+    }
+    
+    QPushButton:hover {
+        background-color: #CCC;
+    }
+    
+    QPushButton:pressed {
+        background-color: #BBB;
+    }
+    
+    QTextEdit {
+        background-color: #DDD;
+        color: #333;
+        border: 2px solid #AAA;
+    }
+    
+    QLineEdit {
+        background-color: #DDD;
+        color: #333;
+        border: 2px solid #AAA;
+    }
+    
+    QLabel {
+        color: #333;
+    }
+    
+    QMenuBar {
+        background-color: #DDD;
+        color: #333;
+    }
+    
+    QMenuBar:item {
+        background-color: #DDD;
+        color: #333;
+    }
+    
+    QMenuBar:item:selected {
+        background-color: #CCC;
+    }
+    
+    QProgressBar {
+        text-align: center;
+    }
+    
+    QProgressBar::chunk {
+        background-color: #DDD;
+    }
+    
+    QMessageBox {
+        background-color: #EFEFEF;
+        color: #333;
+        border: 2px solid #AAA;
+    }
+    
+    QDialog {
+        background-color: #EFEFEF;
+        color: #333;
+    }
+    """
+
+    def switch_theme(self, mode):
+        if mode == 'dark':
+            self.setStyleSheet(self.DARK_STYLE)
+        else:
+            self.setStyleSheet(self.LIGHT_STYLE)
+
+    def toggle_theme(self):
+        if 'Light Mode' in self.theme_action.text():
+            self.switch_theme('light')
+            self.theme_action.setText('Switch to Dark Mode')
+        else:
+            self.switch_theme('dark')
+            self.theme_action.setText('Switch to Light Mode')
 
     def set_style(self):
-        style = """
-        QMainWindow {
-            background-color: #2C2C2C;
-            color: #FFFFFF;
-        }
-
-        QPushButton {
-            background-color: #404040;
-            color: #FFFFFF;
-            border: 2px solid #FFFFFF;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px;
-        }
-
-        QPushButton:hover {
-            background-color: #505050;
-        }
-
-        QPushButton:pressed {
-            background-color: #606060;
-        }
-
-        QTextEdit {
-            background-color: #404040;
-            color: #FFFFFF;
-            border: 2px solid #FFFFFF;
-        }
-
-        QLineEdit {
-            background-color: #404040;
-            color: #FFFFFF;
-            border: 2px solid #FFFFFF;
-        }
-
-        QLabel {
-            color: #FFFFFF;
-        }
-
-        QMenuBar {
-            background-color: #404040;
-            color: #FFFFFF;
-        }
-
-        QMenuBar:item {
-            background-color: #404040;
-            color: #FFFFFF;
-        }
-
-        QMenuBar:item:selected {
-            background-color: #505050;
-        }
-
-        QProgressBar {
-            text-align: center;
-        }
-
-        QProgressBar::chunk {
-            background-color: #404040;
-        }
-
-        QMessageBox {
-            background-color: #404040;
-            color: #FFFFFF;
-            border: 2px solid #FFFFFF;
-        }
-
-        QDialog {
-            background-color: #2C2C2C;
-            color: #FFFFFF;
-        }
-        """
-        self.setStyleSheet(style)
-
-        # Additional lines to make the code longer
-        for i in range(100):
-            pass
+        self.setStyleSheet(self.DARK_STYLE)
 
     def setup_menu(self):
         menubar = self.menuBar()
@@ -235,17 +314,24 @@ class MainWindow(QMainWindow):
         rename_tiff_action.setDisabled(True)
         czi_menu.addAction(rename_tiff_action)
 
-        help_menu = menubar.addMenu('&Help')
-
-        help_action = QAction('Github', self)
-        help_action.triggered.connect(lambda: webbrowser.open('https://github.com/not-availiable/AstrocytesImageAnalysis'))
-        help_menu.addAction(help_action)
-
         exit_action = QAction('Exit', self)
         exit_action.setShortcut('Ctrl+Q')
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
+        # Add Theme menu to the menu bar
+        theme_menu = menubar.addMenu('&Theme')
+        self.theme_action = QAction('Switch to Light Mode', self)
+        self.theme_action.triggered.connect(self.toggle_theme)
+        theme_menu.addAction(self.theme_action)
+        # Help section
+        help_menu = menubar.addMenu('&Help')
+        github_link_action = QAction('GitHub Repository', self)
+        github_link_action.triggered.connect(self.open_github_link)
+        help_menu.addAction(github_link_action)
+    def open_github_link(self):
+        import webbrowser
+        webbrowser.open("https://github.com/not-availiable/AstrocytesImageAnalysis")
     def start_analysis(self):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -351,7 +437,6 @@ class MainWindow(QMainWindow):
             file_name = os.path.join(current_dir, f"plot_raw{self.image_index}")
         else:
             file_name = os.path.join(current_dir, f"plot{self.image_index}")
-        print(f"Trying to load: {file_name}")
         if os.path.exists(file_name):
             pixmap = QPixmap(file_name)
             self.graphics_scene.clear()
@@ -389,12 +474,8 @@ class MainWindow(QMainWindow):
             self.czi_file = czi_file_input.text()
             self.output_dir = output_dir_input.text()
 
-            # Run the CZI to TIFF conversion in a new process
-            subprocess.Popen(["python3", "CZI2TIFFwithTIMESTAMPS.py", self.czi_file, self.output_dir])
-
-    def read_czi_conversion_output(self):
-        output = self.czi_conversion_process.readAllStandardOutput().data().decode()
-        self.status_edit.append(output)
+            script_path = os.path.join(os.getcwd(), "ConversionsScripts", "CZI2TIFFwithTIMESTAMPS.py")
+            subprocess.Popen(["python3", script_path, self.czi_file, self.output_dir])
 
     def rename_tiffs(self):
         pass
