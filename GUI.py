@@ -292,11 +292,11 @@ class MainWindow(QMainWindow):
         theme_menu = menubar.addMenu('&Theme')
         
         light_mode_action = QAction('Light Mode', self)
-        light_mode_action.triggered.connect(self.set_style)
+        light_mode_action.triggered.connect(lambda: self.set_style("light"))  # Use lambda to pass argument
         theme_menu.addAction(light_mode_action)
 
         dark_mode_action = QAction('Dark Mode', self)
-        dark_mode_action.triggered.connect(self.set_style)
+        dark_mode_action.triggered.connect(lambda: self.set_style("dark"))  # Use lambda to pass argument
         theme_menu.addAction(dark_mode_action)
 
         # Help
