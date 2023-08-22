@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from cellpose import utils
 import math
+import json
+import os
 
 # GLOBAL VARIABLES
 
@@ -29,8 +31,11 @@ def create_dataframe(rois):
 
 # Code to create the csv from the data
 def create_csv():
+    config_file = open("config.json", "r")
+    config = json.load(config_file)
+    config_file.close()
     statsdf = pd.DataFrame(stats)
-    statsdf.to_csv('AstrocyteStats.csv', index = False)
+    statsdf.to_csv(os.path.join(config["experiment_name"], 'AstrocyteStats.csv'), index = False)
 
 
 def lerp(start, end, t):

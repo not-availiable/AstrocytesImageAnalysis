@@ -4,21 +4,23 @@ import subprocess
 import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, QProgressBar, QMessageBox, QFileDialog, QMenuBar, QAction, QGraphicsView, QGraphicsScene, QLineEdit, QLabel, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QDialog, QSlider, QToolTip)
 from PyQt5.QtGui import QPixmap, QIcon, QFont, QImageReader
-from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess, QProcessEnvironment
+from PyQt5.QtCore import QTimer, QEvent, QThread, Qt, QProcess, QProcessEnvironment, QDir
 from skimage.transform import rescale
 from skimage.io import imread, imsave
 
-# AstrocyteAnalysis subprocess
+
+# AstrocytesAnalysis subprocess
 class WorkerThread(QThread):
     def __init__(self):
         super().__init__()
 
     def run(self):
-        self.process = subprocess.Popen(["python3", "AstrocyteAnalysis.py"])
+        self.process = subprocess.Popen(["python3", "AstrocytesAnalysis.py"])
 
     def stop(self):
         if hasattr(self, "process"):
             self.process.terminate()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -252,22 +254,33 @@ class MainWindow(QMainWindow):
 
         # File Menu
         file_menu = menubar.addMenu('&File')
-        
+        config_file = open("config.json", "r")
+        config = json.load(config_file)
+
         load_nuclei_model_action = QAction('Load Nuclei Model', self)
         load_nuclei_model_action.triggered.connect(self.load_nuclei_model)
         file_menu.addAction(load_nuclei_model_action)
+        self.status_edit.append(f"Current Nuclei Model: {config['nuclei_model_location']}")
 
         load_cyto_model_action = QAction('Load Cyto Model', self)
         load_cyto_model_action.triggered.connect(self.load_cyto_model)
         file_menu.addAction(load_cyto_model_action)
+        self.status_edit.append(f"Current Cyto Model: {config['cyto_model_location']}")
 
         load_pre_dir_action = QAction('Load Pre Directory', self)
         load_pre_dir_action.triggered.connect(self.load_pre_dir)
         file_menu.addAction(load_pre_dir_action)
+        self.status_edit.append(f"Current Pre Directory: {config['pre_directory_location']}")
 
         load_post_dir_action = QAction('Load Post Directory', self)
         load_post_dir_action.triggered.connect(self.load_post_dir)
         file_menu.addAction(load_post_dir_action)
+        self.status_edit.append(f"Current Post Directory: {config['post_directory_location']}")
+
+        load_experiment_name_action = QAction('Current Experiment Name', self)
+        load_experiment_name_action.triggered.connect(self.load_experiment_name)
+        file_menu.addAction(load_experiment_name_action)
+        self.status_edit.append(f"Current Experiment Name: {config['experiment_name']}")
 
         exit_action = QAction('Exit', self)
         exit_action.setShortcut('Ctrl+Q')
@@ -276,7 +289,7 @@ class MainWindow(QMainWindow):
 
         # CZI Menu
         czi_menu = menubar.addMenu('&CZI')
-        
+
         czi_to_tiff_action = QAction('Convert CZI to TIFF with timestamps', self)
         czi_to_tiff_action.triggered.connect(self.convert_czi_to_tiff)
         czi_menu.addAction(czi_to_tiff_action)
@@ -290,7 +303,7 @@ class MainWindow(QMainWindow):
 
         # Theme Menu
         theme_menu = menubar.addMenu('&Theme')
-        
+
         light_mode_action = QAction('Light Mode', self)
         light_mode_action.triggered.connect(lambda: self.set_style("light"))  # Use lambda to pass argument
         theme_menu.addAction(light_mode_action)
@@ -305,6 +318,17 @@ class MainWindow(QMainWindow):
         menubar.addAction(help_action)
 
     def start_analysis(self):
+        # check if the experiment already exists
+        config_file = open("config.json", "r")
+        config = json.load(config_file)
+        config_file.close()
+        if os.path.exists(config["experiment_name"]):
+            warn_msg = "This experiment already exists, are you sure you want to overwrite it?"
+            reply = QMessageBox.question(self, 'Warning', warn_msg, QMessageBox.Yes, QMessageBox.No)
+
+            if reply == QMessageBox.No:
+                return
+
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.status_edit.append("Starting analysis...")
@@ -356,21 +380,49 @@ class MainWindow(QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(self, "Load Nuclei Cellpose Model")
         if file_name:
             self.update_config("nuclei_model_location", file_name)
+            config_file = open("config.json", "r")
+            config = json.load(config_file)
+            config_file.close()
+            self.status_edit.append(f"New Nuclei Model: {config['nuclei_model_location']}")
 
     def load_cyto_model(self):
         file_name, _ = QFileDialog.getOpenFileName(self, "Load Cytoplasm Cellpose Model")
         if file_name:
             self.update_config("cyto_model_location", file_name)
+            config_file = open("config.json", "r")
+            config = json.load(config_file)
+            config_file.close()
+            self.status_edit.append(f"New Cyto Model: {config['cyto_model_location']}")
 
     def load_pre_dir(self):
         dir_name = QFileDialog.getExistingDirectory(self, "Load Pre Directory")
         if dir_name:
             self.update_config("pre_directory_location", dir_name)
+            config_file = open("config.json", "r")
+            config = json.load(config_file)
+            config_file.close()
+            self.status_edit.append(f"New Pre Directory: {config['pre_directory_location']}")
 
     def load_post_dir(self):
         dir_name = QFileDialog.getExistingDirectory(self, "Load Post Directory")
         if dir_name:
             self.update_config("post_directory_location", dir_name)
+            config_file = open("config.json", "r")
+            config = json.load(config_file)
+            config_file.close()
+            self.status_edit.append(f"New Post Directory: {config['post_directory_location']}")
+
+    def load_experiment_name(self):
+        experiment_name, ok = QInputDialog.getText(self, "Rename Experiment",
+                                    "New Experiment Name:", QLineEdit.Normal, 
+                                    QDir().home().dirName())
+        if ok and experiment_name:
+            experiment_name = str(experiment_name)
+            self.update_config("experiment_name", experiment_name)
+            config_file = open("config.json", "r")
+            config = json.load(config_file)
+            self.status_edit.append(f"New Experiment Name: {config['experiment_name']}")
+            config_file.close()
 
     def update_config(self, key, value):
         with open("config.json", "r") as f:
@@ -409,10 +461,13 @@ class MainWindow(QMainWindow):
 
     def load_image(self):
         current_dir = os.getcwd()
+        config_file = open("config.json", "r")
+        config = json.load(config_file)
+        config_file.close()
         if self.image_mode == "raw":
-            file_name = os.path.join(current_dir, f"plot_raw{self.image_index}")
+            file_name = os.path.join(os.path.join(current_dir, config["experiment_name"]), f"plot_raw{self.image_index}.png")
         else:
-            file_name = os.path.join(current_dir, f"plot{self.image_index}")
+            file_name = os.path.join(os.path.join(current_dir, config["experiment_name"]), f"plot{self.image_index}.png")
         print(f"Trying to load: {file_name}")
         if os.path.exists(file_name):
             pixmap = QPixmap(file_name)
@@ -420,12 +475,21 @@ class MainWindow(QMainWindow):
             self.graphics_scene.addPixmap(pixmap)
             self.graphics_view.fitInView(self.graphics_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
         else:
-            message_box = QMessageBox(self)
-            message_box.setIcon(QMessageBox.Warning)
-            message_box.setWindowTitle("Image not found")
-            message_box.setText("The requested image does not exist.")
-            message_box.setStyleSheet("QMessageBox { background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF; }")
-            message_box.exec_()
+            self.image_index = 0
+            file_name = os.path.join(os.path.join(current_dir, config["experiment_name"]), "plot0.png")
+            print("Reached end of image list, attempting to load first image")
+            if os.path.exists(file_name):
+                pixmap = QPixmap(file_name)
+                self.graphics_scene.clear()
+                self.graphics_scene.addPixmap(pixmap)
+                self.graphics_view.fitInView(self.graphics_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+            else:
+                message_box = QMessageBox(self)
+                message_box.setIcon(QMessageBox.Warning)
+                message_box.setWindowTitle("Image not found")
+                message_box.setText("The requested image does not exist.")
+                message_box.setStyleSheet("QMessageBox { background-color: #404040; color: #FFFFFF; border: 2px solid #FFFFFF; }")
+                message_box.exec_()
 
     def convert_czi_to_tiff(self):
         dialog = QDialog(self)
