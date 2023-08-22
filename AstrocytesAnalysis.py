@@ -7,12 +7,34 @@ import multiprocessing
 import time
 import json
 from natsort import natsorted
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
+import concurrent.futures
 import AstrocyteAStar as astar
 import FullAnalysis as anal
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
+
+config = []
+pre_dir_path = ""
+post_dir_path = ""
+pre_image_paths = []
+first_sampling_image_path = ""
+sampling_image = ""
+first_image_sample = ""
+first_image_normalized_intensities = []
+masks = []
+dead_cell = []
+close_cell_count = 0
+nuclei_centers = []
+connection_list = []
+min_intensity = 0
+max_intensity = 0
+pre_offset = 0
+post_offset = 0
+split_point = 0
+stats = []
+
 
 
 def load_path(file):
@@ -28,6 +50,7 @@ def get_center_location(o):
 
 
 def generate_masks():
+    global masks
     global dead_cell
     global close_cell_count
     global nuclei_centers
@@ -87,14 +110,12 @@ def save_masks(masks):
 
 
 def sample_data(filedata):
-    # global graphData
-    global first_image_sample
-    global first_image_normalized_intensities
+    masks = []
 
     min_intensity = 1
     max_intensity = 1
 
-    filepath, insert_index = filedata
+    filepath, insert_index, masks, first_image_sample, first_image_normalized_intensities = filedata
 
     sampling_image = plt.imread(filepath)
 
@@ -102,15 +123,21 @@ def sample_data(filedata):
     # the bg_intensity is the mean of all pixels with a z_score less than 1.21
     bg_intensity = np.mean(sampling_image[np.where((sampling_image - np.mean(sampling_image)) / np.std(sampling_image) < 1.21)])
 
+    print("masks: " + str(len(masks)))
     for mask in masks:
         intensity = np.sum(sampling_image[mask]) / np.sum(mask)
         normalized_intensity = (intensity - bg_intensity)
         temp.append(normalized_intensity)
+        print(str(len(temp)), flush=True)
         if first_image_sample:
             first_image_normalized_intensities.append(normalized_intensity)
 
+    print("PreDivLen: " + str(len(temp)))
+
     # divide intensities by the original intensities
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
+
+    print("PostDivLen: " + str(len(temp)))
 
     for value in temp:
         if value < min_intensity:
@@ -118,9 +145,9 @@ def sample_data(filedata):
         if value > max_intensity:
             max_intensity = value
 
-    print("Finished processing frame: " + str(insert_index))
+    print("Finished processing frame: " + str(insert_index), flush=True)
     first_image_sample = False
-    return temp, insert_index, min_intensity, max_intensity
+    return temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities
 
 
 def display_data(graph_data):
@@ -210,7 +237,7 @@ if __name__ == '__main__':
     first_image_sample = True
     first_image_normalized_intensities = []
 
-    os.makedirs(os.path.join(os.getcwd(), config["experiment_name"]))
+    os.makedirs(os.path.join(os.getcwd(), config["experiment_name"]), exist_ok=True)
 
     min_intensity = 1
     max_intensity = 1
@@ -224,34 +251,35 @@ if __name__ == '__main__':
     nuc_model = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
     cyto_model = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
-    print("Detecting Nuclei")
+    print("Detecting Nuclei", flush=True)
     nuc_dat = nuc_model.eval(sampling_image, channels=[2, 0])[0]
-    print("Detecting Cytoplasm")
+    print("Detecting Cytoplasm", flush=True)
     cyto_dat = cyto_model.eval(sampling_image, channels=[2, 0])[0]
 
     # plot image with outlines overlaid in red
     nuc_outlines = utils.outlines_list(nuc_dat)
     cyto_outlines = utils.outlines_list(cyto_dat)
 
-    masks = []
-
     nuc_whole_mask = nuc_dat
     nuc_whole_mask = nuc_whole_mask > 0
 
     cyto_whole_mask = cyto_dat
 
-    print("Generating Masks")
+    print("Generating Masks", flush=True)
     generate_masks()
 
     graph_data = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
+    print(graph_data.shape, flush=True)
 
-    full_image_data = [(first_sampling_image_path, len(pre_image_paths)-1)]
+    full_image_data = [(first_sampling_image_path, len(pre_image_paths)-1, masks, first_image_sample, first_image_normalized_intensities)]
 
     # run this image outside of the multiprocessing to gurantee that it happens first
     temp = []
     insert_index = len(pre_image_paths) - 1
 
-    temp, insert_index, min_intensity, max_intensity = sample_data(full_image_data[0])
+    print("MaskLen1: " + str(len(masks)), flush=True)
+    temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities = sample_data(full_image_data[0])
+
     min_intensities.append(min_intensity)
     max_intensities.append(max_intensity)
     graph_data[:, insert_index] = temp
@@ -261,19 +289,19 @@ if __name__ == '__main__':
     i = 0
     for image_path in pre_image_paths:
         if i != insert_index:
-            full_image_data.append((os.path.join(pre_dir_path, image_path), i))
+            full_image_data.append((os.path.join(pre_dir_path, image_path), i, masks, first_image_sample, first_image_normalized_intensities))
         i += 1
 
     for image_path in post_image_paths:
-        full_image_data.append((os.path.join(post_dir_path, image_path), i))
+        full_image_data.append((os.path.join(post_dir_path, image_path), i, masks, first_image_sample, first_image_normalized_intensities))
         i += 1
 
     full_image_data.pop(0)
 
     # sample all of the data using multiprocessing
     p = Pool(16)
-    for result in p.map(sample_data, full_image_data):
-        temp, insert_index, min_intensity, max_intensity = result
+    for result in p.imap(sample_data, full_image_data):
+        temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities= result
         min_intensities.append(min_intensity)
         max_intensities.append(max_intensity)
         graph_data[:, insert_index] = temp
@@ -299,7 +327,7 @@ if __name__ == '__main__':
 
     dead_cell = min_roi_intensity_index
 
-    print("Dead Cell: " + str(dead_cell))
+    print("Dead Cell: " + str(dead_cell), flush=True)
 
     dead_cell_center = nuclei_centers[dead_cell]
     for i, center in enumerate(nuclei_centers):
@@ -307,7 +335,7 @@ if __name__ == '__main__':
         if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
             close_cell_count += 1
 
-    print("Close Cell Count: " + str(close_cell_count))
+    print("Close Cell Count: " + str(close_cell_count), flush=True)
 
     # get connections from astar algorithm
     connection_list = astar.run_astar_algorithm(first_sampling_image_path,
