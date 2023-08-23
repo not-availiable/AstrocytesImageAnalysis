@@ -123,21 +123,15 @@ def sample_data(filedata):
     # the bg_intensity is the mean of all pixels with a z_score less than 1.21
     bg_intensity = np.mean(sampling_image[np.where((sampling_image - np.mean(sampling_image)) / np.std(sampling_image) < 1.21)])
 
-    print("masks: " + str(len(masks)))
     for mask in masks:
         intensity = np.sum(sampling_image[mask]) / np.sum(mask)
         normalized_intensity = (intensity - bg_intensity)
         temp.append(normalized_intensity)
-        print(str(len(temp)), flush=True)
         if first_image_sample:
             first_image_normalized_intensities.append(normalized_intensity)
 
-    print("PreDivLen: " + str(len(temp)))
-
     # divide intensities by the original intensities
     temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
-
-    print("PostDivLen: " + str(len(temp)))
 
     for value in temp:
         if value < min_intensity:
@@ -269,7 +263,6 @@ if __name__ == '__main__':
     generate_masks()
 
     graph_data = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
-    print(graph_data.shape, flush=True)
 
     full_image_data = [(first_sampling_image_path, len(pre_image_paths)-1, masks, first_image_sample, first_image_normalized_intensities)]
 
@@ -277,7 +270,6 @@ if __name__ == '__main__':
     temp = []
     insert_index = len(pre_image_paths) - 1
 
-    print("MaskLen1: " + str(len(masks)), flush=True)
     temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities = sample_data(full_image_data[0])
 
     min_intensities.append(min_intensity)
@@ -300,7 +292,7 @@ if __name__ == '__main__':
 
     # sample all of the data using multiprocessing
     p = Pool(16)
-    for result in p.imap(sample_data, full_image_data):
+    for result in p.map(sample_data, full_image_data):
         temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities= result
         min_intensities.append(min_intensity)
         max_intensities.append(max_intensity)
