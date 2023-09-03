@@ -5,6 +5,8 @@ currentDir=$(pwd)
 targetDir=$1
 # where the .tiff folders will go
 outputDir=$2
+# 0 to create new files 1 to rename existing ones
+isRenaming=$3
 # get a list of the names
 cd "$targetDir"
 ls *.czi > listOfFiles.txt
@@ -27,7 +29,7 @@ do
 	# path to directory that will contain the first five images
 	intendedTrainingPath="$outputFolderPath/IntendedTrainingFiles"
 	# run the conversion script on the target .czi
-	python czi2tiff.py "$inputFilePath" "$outputFolderPath" "$intendedTrainingPath"
+	python czi2tiff.py "$inputFilePath" "$outputFolderPath" "$intendedTrainingPath" $isRenaming
 	# remove the middle conversion step
 	cd "$targetDir"
 	rm *.tif

@@ -1,374 +1,353 @@
-from audioop import mul
-import sys
 import os
 import math
 import numpy as np
-import numpy.ma as ma
 from cellpose import models, utils
 from matplotlib import pyplot as plt
 import multiprocessing
 import time
 import json
 from natsort import natsorted
-from tqdm import tqdm
-from multiprocessing import Pool
-from skimage.transform import rescale
+from multiprocessing import Pool, Manager
+import concurrent.futures
+import AstrocyteAStar as astar
+import FullAnalysis as anal
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
 
-# function to calculate the center location of a mask
+config = []
+pre_dir_path = ""
+post_dir_path = ""
+pre_image_paths = []
+first_sampling_image_path = ""
+sampling_image = ""
+first_image_sample = ""
+first_image_normalized_intensities = []
+masks = []
+dead_cell = []
+close_cell_count = 0
+nuclei_centers = []
+connection_list = []
+min_intensity = 0
+max_intensity = 0
+pre_offset = 0
+post_offset = 0
+split_point = 0
+stats = []
+
+
+
+def load_path(file):
+    f = open(file)
+    path = f.readline().rstrip()
+    f.close()
+    return path
+
+
 def get_center_location(o):
-    try:
-        # calculates the mean of the coordinates to get the center
-        return o[:, 0].mean(), o[:, 1].mean()  
-    except Exception as e:
-        print(f"Error in get_center_location: {e}")
-        return None, None
+    # takes average
+    return o[:, 0].mean(), o[:, 1].mean()
 
-# function to generate the masks for each cell
+
 def generate_masks():
-    try:
-        i = 0
-        # loop through each nuclei outline
-        for o in nucOutlines:
-            # calculate center of the nuclei
-            centerX, centerY = get_center_location(o)
-            # add the center location to the plot
-            plt.annotate(str(i), (centerX, centerY), color="white")
-            # plot the outline of the nuclei
-            plt.plot(o[:,0], o[:,1], color='r')
+    global masks
+    global dead_cell
+    global close_cell_count
+    global nuclei_centers
 
-            # calculate the standard deviation of the x and y coordinates
-            stdX = np.std(o[:,0])
-            stdY = np.std(o[:,1])
-            stdMax = max(stdX, stdY)
+    i = 0
+    for o in nuc_outlines:
+        # nuclei
+        # get average x and y
+        center_x, center_y = get_center_location(o)
+        nuclei_centers.append((center_x, center_y))
+        plt.annotate(str(i), (center_x, center_y), color="white")
 
-            # set flag to check if there is a cytoplasm close to the nuclei
-            hasCloseCytoplasm = False
-            closeMaskId = 1
-            # loop through each cytoplasm outline
-            for c in cytoOutlines: 
-                # calculate center of the cytoplasm
-                cytoCenterX, cytoCenterY = get_center_location(c)
-                # if the distance between the nuclei and cytoplasm is less than 50, set the flag to True
-                if math.dist([centerX, centerY], [cytoCenterX, cytoCenterY]) < 50:
-                    hasCloseCytoplasm = True
-                    break
-                closeMaskId+=1
+        plt.plot(o[:, 0], o[:, 1], color='r')
 
-            # use only the relevant part of the cytoplasm mask 
-            mask = cytoWholeMask == closeMaskId
-            # if there are no valid cytoplasm masks, use a circular mask
-            if not hasCloseCytoplasm:
-                plt.plot(centerX, centerY, marker=".", markerfacecolor=(0, 0, 0, 0), markeredgecolor=(0, 0, 1, 1), markersize=2*stdMax)
-                h, w = samplingImage.shape[:2]
-                mask = create_circular_mask(h, w, center=(centerX, centerY), radius=2*stdMax)
-            
-            # remove the nucleus from the mask
-            mask[nucWholeMask] = 0
-            # add the mask to the list of masks
-            masks.append(mask)
-            i += 1
-    except Exception as e:
-        print(f"Error in generate_masks: {e}")
+        # get standard deviation
+        std_x = np.std(o[:, 0])
+        std_y = np.std(o[:, 1])
+        std_max = max(std_x, std_y)
 
-# function to save the masks to a numpy array file
+        # cytoplasm
+        # see if there is a cytoplasm that is close enough to a nucleus to use
+        has_close_cytoplasm = False
+        close_mask_id = 1
+        for c in cyto_outlines:
+            if i == 0:
+                plt.plot(c[:, 0], c[:, 1], color='r')
+            cyto_center_x, cyto_center_y = get_center_location(c)
+            if math.dist([center_x, center_y], [cyto_center_x, cyto_center_y]) < 50:
+                has_close_cytoplasm = True
+                break
+            close_mask_id += 1
+
+        # use only the relavant part of the cytoplasm mask
+        mask = cyto_whole_mask == close_mask_id
+        # use original circle method if there are no valid cytoplasm masks
+        if not has_close_cytoplasm:
+            h, w = sampling_image.shape[:2]
+            mask = create_circular_mask(h, w, center=(center_x, center_y), radius=2*std_max)
+
+        # remove the nucleus from the mask
+        mask[nuc_whole_mask] = 0
+        masks.append(mask)
+        i += 1
+
+    plt.imshow(sampling_image)
+    plt.savefig(os.path.join(config["experiment_name"], "masks_pre.png"), format="png")
+    post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
+    plt.imshow(post_image)
+    plt.savefig(os.path.join(config["experiment_name"], "masks_post.png"), format="png")
+
+
 def save_masks(masks):
-    try:
-        # initialize an empty array
-        combined_mask = np.empty(())
-        # loop through each mask and stack it to the combined mask
-        for mask in masks:
-            combined_mask = np.dstack(combined_mask, mask)
-        # save the combined mask to a numpy array file
-        np.save("masks.npy",combined_mask)
-    except Exception as e:
-        print(f"Error in save_masks: {e}")
+    combined_mask = np.empty(())
+    for mask in masks:
+        combined_mask = np.dstack(combined_mask, mask)
+    np.save("masks.npy", combined_mask)
 
-# function to sample the data from the image files
+
 def sample_data(filedata):
-    global first_image_sample
-    global first_image_normalized_intensities
+    masks = []
 
-    try:
-        # unpack the filedata into filepath and insert_index
-        filepath, insert_index = filedata
-        # print the index
-        print(insert_index)
-        # read the image file
-        samplingImage = plt.imread(filepath)
-        # downscale the image for faster cellpose readability
-        samplingImage = rescale(samplingImage, 0.8, anti_aliasing=True)
+    min_intensity = 1
+    max_intensity = 1
 
-        # initialize temp arrays for storing intensity data
-        temp = []
-        temp_raw = []
-        # calculate the minimum intensity of the image
-        min_intensity = np.min(samplingImage)
-        # loop through each mask
-        for mask in masks:
-            # calculate the intensity of the mask
-            intensity = np.sum(samplingImage[mask]) / np.sum(mask)
-            # add the intensity to the raw temp array
-            temp_raw.append(intensity)
-            # calculate the normalized intensity
-            normalized_intensity = (intensity - min_intensity)
-            # add the normalized intensity to the temp array
-            temp.append(normalized_intensity)
-            # if it's the first image, add the normalized intensity to the first image normalized intensities array
-            if first_image_sample:
-                first_image_normalized_intensities.append(normalized_intensity)
-        
-        # set the first image sample flag to False after the first image
-        first_image_sample = False
-        # normalize the temp array
-        temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
+    filepath, insert_index, masks, first_image_sample, first_image_normalized_intensities = filedata
 
-        # return the normalized intensities, index, and raw intensities
-        return temp, insert_index, temp_raw
-    except Exception as e:
-        print(f"Error occurred while sampling data: {e}")
-        return None, None, None
+    sampling_image = plt.imread(filepath)
 
-# function to display the normalized data
-def display_normalized_data(graphData, samplingImage):
-    try:
-        # initialize an empty mask
-        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
-        for mask in masks:
-            fullMask = np.logical_or(fullMask, mask)
+    temp = []
+    # the bg_intensity is the mean of all pixels with a z_score less than 1.21
+    bg_intensity = np.mean(sampling_image[np.where((sampling_image - np.mean(sampling_image)) / np.std(sampling_image) < 1.21)])
 
-        # create a copy of the sampling image with three channels
-        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
-        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
-        samplingImage_copy[~fullMask, 0] = 0
-        samplingImage_copy[~fullMask, 2] = 0
-        # display the image
-        plt.imshow(samplingImage_copy)
-        # save the image as a PNG
-        plt.savefig("masks", format="png")
+    for mask in masks:
+        intensity = np.sum(sampling_image[mask]) / np.sum(mask)
+        normalized_intensity = (intensity - bg_intensity)
+        temp.append(normalized_intensity)
+        if first_image_sample:
+            first_image_normalized_intensities.append(normalized_intensity)
 
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+    # divide intensities by the original intensities
+    temp = [i / j for i, j in zip(temp, first_image_normalized_intensities)]
 
-        # loop through each mask
-        for i in range(len(masks)):
-            # clear the current figure
-            plt.clf()
-            # plot the pre image data
-            plt.plot(graphData[i][:split_point], color="blue")
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([graphData[i][split_point-1], graphData[i][split_point]])
-            plt.plot(x_points, y_points, color="red")
-            # plot the post image data
-            num_points = min(len(post_offset), len(graphData[i][split_point-1:]))
-            plt.plot(post_offset[:num_points], graphData[i][split_point-1:][:num_points], color="red")
-            # save the plot as a PNG
-            plt.savefig("plot" + str(i), format="png")
+    for value in temp:
+        if value < min_intensity:
+            min_intensity = value
+        if value > max_intensity:
+            max_intensity = value
 
-        # print the execution time
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"The function took {execution_time} seconds to run.")
-    except ValueError as ve:
-        print(f"ValueError: {ve}")
-        print("Error occurred while plotting the data.")
-    except IndexError as ie:
-        print(f"IndexError: {ie}")
-        print("Error occurred during indexing. Check the dimensions of arrays.")
-    except Exception as e:
-        print(f"Error: {e}")
-        print("An unexpected error occurred.")
+    print("Finished processing frame: " + str(insert_index), flush=True)
+    first_image_sample = False
+    return temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities
 
-# function to display the raw data
-def display_raw_data(rawData, samplingImage):
-    try:
-        # initialize an empty mask
-        fullMask = np.zeros(samplingImage.shape[:2], dtype=bool)
-        # combine all masks into one
-        for mask in masks:
-            fullMask = np.logical_or(fullMask, mask)
 
-        # create a copy of the sampling image with three channels
-        samplingImage_copy = np.zeros((samplingImage.shape[0], samplingImage.shape[1], 3), dtype=np.uint8)
-        # copy the green channel from the original sampling image to the copy
-        samplingImage_copy[:, :, 1] = samplingImage[:, :, 1]
-        # set the red and blue channels of the masked region to 0
-        samplingImage_copy[~fullMask, 0] = 0
-        samplingImage_copy[~fullMask, 2] = 0
-        # display the image
-        plt.imshow(samplingImage_copy)
-        # save the image as a PNG
-        plt.savefig("masks_raw", format="png")
+def display_data(graph_data):
+    global connection_list
+    global min_intensity
+    global max_intensity
+    global pre_offset
+    global post_offset
+    global split_point
+    global stats
 
-        # calculate the split point between pre and post image paths
-        split_point = len(pre_image_paths)
-        # calculate the offset for the post image paths
-        post_offset = list(range(split_point, split_point + len(post_image_paths)))
+    graph_data = np.delete(graph_data, len(graph_data), 1)
 
-        # loop through each mask
-        for i in range(len(masks)):
-            # clear the current figure
-            plt.clf()
-            # plot the pre image data
-            plt.plot(rawData[i][:split_point], color="blue")
-            # plot the connecting line
-            x_points = np.array([split_point-1, split_point])
-            y_points = np.array([rawData[i][split_point-1], rawData[i][split_point]])
-            plt.plot(x_points, y_points, color="red")
-            # plot the post image data
-            num_points = min(len(post_offset), len(rawData[i][split_point-1:]))
-            plt.plot(post_offset[:num_points], rawData[i][split_point-1:][:num_points], color="red")
-            # save the plot as a PNG
-            plt.savefig("plot_raw" + str(i), format="png")
+    for i in range(len(masks)):
+        plt.clf()
+        # pre graph
+        plt.plot(pre_offset, graph_data[i][:split_point], color="blue")
+        # post graph
+        plt.plot(post_offset, graph_data[i][split_point-1:], color="red")
+        title_text = ""
+        match connection_list[i]:
+            case 0:
+                title_text = "Not Connected"
+            case 1:
+                title_text = "Networked"
+            case 2:
+                title_text = "Connected"
+            case 3:
+                title_text = "Dead Cell"
+        plt.title(title_text)
+        plt.ylim(min_intensity, max_intensity+.05)
+        plt.xlabel("Frame #")
+        plt.ylabel("normalized intensity")
+        plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
+        plt.axvline(stats['FWHM_Right_Index'][i], linestyle="dashed")
+        plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
+        plt.savefig(os.path.join(config["experiment_name"], "plot" + str(i) + ".png"), format="png")
 
-        # print the execution time
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"The function took {execution_time} seconds to run.")
-    except ValueError as ve:
-        print(f"ValueError: {ve}")
-        print("Error occurred while plotting the data.")
-    except IndexError as ie:
-        print(f"IndexError: {ie}")
-        print("Error occurred during indexing. Check the dimensions of arrays.")
-    except Exception as e:
-        print(f"Error: {e}")
-        print("An unexpected error occurred.")
 
-# function to create a circular mask
 def create_circular_mask(h, w, center=None, radius=None):
-    try:
-        # if no center is provided, use the center of the image
-        if center is None:
-            center = (int(w/2), int(h/2))
-        # if no radius is provided, use the smallest distance between the center and the image edges
-        if radius is None:
-            radius = min(center[0], center[1], w-center[0], h-center[1])
+    if center is None:  # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None:  # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
 
-        # generate a grid of coordinates
-        Y, X = np.ogrid[:h, :w]
-        # calculate the distance from each coordinate to the center
-        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
-        # generate a mask for coordinates within the radius
-        mask = dist_from_center <= radius
-        return mask
-    except Exception as e:
-        print(f"Error in create_circular_mask: {e}")
-        return None
+    mask = dist_from_center <= radius
+    return mask
 
-# main script
+
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
-    # load the config file
+    # Load the configuration file
     config = []
     with open("config.json") as f:
         config = json.load(f)
 
-    # get the directory paths for pre and post images
     pre_dir_path = config["pre_directory_location"]
     post_dir_path = config["post_directory_location"]
-    # get the image paths within each directory
+
+    # get all of the filepaths from the pre and post image folders
+    # ignoring hidden folders to fix DS_Store issue
+    # natsorted is necessary because the files are not sorted in the correct order by default
     pre_image_paths = os.listdir(pre_dir_path)
+    valid_paths = []
+    for i, path in enumerate(pre_image_paths):
+        if not path.startswith("."):
+            valid_paths.append(pre_image_paths[i])
+    pre_image_paths = valid_paths
     pre_image_paths = natsorted(pre_image_paths)
+
     post_image_paths = os.listdir(post_dir_path)
+    valid_paths = []
+    for i, path in enumerate(post_image_paths):
+        if not path.startswith("."):
+            valid_paths.append(post_image_paths[i])
+    post_image_paths = valid_paths
     post_image_paths = natsorted(post_image_paths)
-    
-    # read the last pre image
-    samplingImage = plt.imread(os.path.join(pre_dir_path, pre_image_paths[-1]))
 
-    # downscale the image for faster cellpose readability
-    samplingImage = rescale(samplingImage, 0.8, anti_aliasing=True)
-
-    # set the first image sample flag to True
+    # variable definitions
+    # first sampling image is the image that every other image will be normalized in relation to
+    first_sampling_image_path = os.path.join(pre_dir_path, pre_image_paths[len(pre_image_paths)-1])
+    sampling_image = plt.imread(first_sampling_image_path)
     first_image_sample = True
-    # initialize the first image normalized intensities array
     first_image_normalized_intensities = []
 
-    # load the Cellpose models for nuclei and cytoplasm
-    nucModel = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
-    cytoModel = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
+    os.makedirs(os.path.join(os.getcwd(), config["experiment_name"]), exist_ok=True)
 
-    # start the timer for cellpose
-    start2=time.time()
-    # evaluate the image with the Cellpose models
-    nucDat = nucModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
-    cytoDat = cytoModel.eval(samplingImage, channels=[2,0], progress=tqdm())[0]
-    # stop the timer for cellpose
-    end2=time.time()
-    # print the time taken for cellpose
-    final=end2-start2
-    print(final)
+    min_intensity = 1
+    max_intensity = 1
+    min_intensities = []
+    max_intensities = []
 
-    # get the outlines for each nucleus and cytoplasm
-    nucOutlines = utils.outlines_list(nucDat)
-    cytoOutlines = utils.outlines_list(cytoDat)
+    dead_cell = 0
+    close_cell_count = 0
+    nuclei_centers = []
 
-    # initialize the masks array
-    masks = []
-    # get the whole mask for each nucleus
-    nucWholeMask = nucDat
-    # binarize the nucleus mask
-    nucWholeMask = nucWholeMask > 0
-    # get the whole mask for each cytoplasm
-    cytoWholeMask = cytoDat
+    nuc_model = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
+    cyto_model = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
-    # generate the masks
+    print("Detecting Nuclei", flush=True)
+    nuc_dat = nuc_model.eval(sampling_image, channels=[2, 0])[0]
+    print("Detecting Cytoplasm", flush=True)
+    cyto_dat = cyto_model.eval(sampling_image, channels=[2, 0])[0]
+
+    # plot image with outlines overlaid in red
+    nuc_outlines = utils.outlines_list(nuc_dat)
+    cyto_outlines = utils.outlines_list(cyto_dat)
+
+    nuc_whole_mask = nuc_dat
+    nuc_whole_mask = nuc_whole_mask > 0
+
+    cyto_whole_mask = cyto_dat
+
+    print("Generating Masks", flush=True)
     generate_masks()
 
-    # initialize the graph data and raw data arrays
-    graphData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
-    rawData = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
-    print(np.shape(graphData))
+    graph_data = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
-    # initialize the full image data array with the last pre image
-    full_image_data = [(os.path.join(pre_dir_path, pre_image_paths[-1]), 0)]
+    full_image_data = [(first_sampling_image_path, len(pre_image_paths)-1, masks, first_image_sample, first_image_normalized_intensities)]
 
-    # sample the data from the first pre image
-    temp, insert_index, temp_raw = sample_data(full_image_data[0])
-    # add the data to the graph data and raw data arrays
-    graphData[:,insert_index] = temp
-    rawData[:,insert_index] = temp_raw
+    # run this image outside of the multiprocessing to gurantee that it happens first
+    temp = []
+    insert_index = len(pre_image_paths) - 1
 
-    # add the rest of the pre images to the full image data array
+    temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities = sample_data(full_image_data[0])
+
+    min_intensities.append(min_intensity)
+    max_intensities.append(max_intensity)
+    graph_data[:, insert_index] = temp
+
+    # add every path but the one that was just sampled
+    # then remove that first path so it is not sampled twice
     i = 0
     for image_path in pre_image_paths:
-        if i > 0:
-            full_image_data.append((os.path.join(pre_dir_path, image_path), i))
-        i+=1
+        if i != insert_index:
+            full_image_data.append((os.path.join(pre_dir_path, image_path), i, masks, first_image_sample, first_image_normalized_intensities))
+        i += 1
 
-    # add the post images to the full image data array
     for image_path in post_image_paths:
-        full_image_data.append((os.path.join(post_dir_path, image_path), i))
-        i+=1
+        full_image_data.append((os.path.join(post_dir_path, image_path), i, masks, first_image_sample, first_image_normalized_intensities))
+        i += 1
 
-    # create a multiprocessing pool
+    full_image_data.pop(0)
+
+    # sample all of the data using multiprocessing
     p = Pool(16)
-    # map the sample_data function to the full image data array
     for result in p.map(sample_data, full_image_data):
-        # unpack the result into temp, insert_index, and temp_raw
-        temp, insert_index, temp_raw = result
-        # add the data to the graph data and raw data arrays
-        graphData[:,insert_index] = temp
-        rawData[:,insert_index] = temp_raw
-
-    # close the multiprocessing pool
+        temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities= result
+        min_intensities.append(min_intensity)
+        max_intensities.append(max_intensity)
+        graph_data[:, insert_index] = temp
     p.close()
-    p.join()
 
-    # save the raw data to a numpy array file
-    np.save("raw_data.npy", rawData)
+    min_intensity = np.min(min_intensities)
+    max_intensity = np.max(max_intensities)
 
-    # display the normalized data
-    display_normalized_data(graphData, samplingImage)
-    # display the raw data
-    display_raw_data(rawData, samplingImage)
+    split_point = len(pre_image_paths)
+
+    # find the dead cell and the close cells automatically
+    # can now run the code overnight because there are no prompts
+    min_roi_intensity = 0
+    min_roi_intensity_index = 0
+    for i, intensities_list in enumerate(graph_data):
+        if i == 0:
+            min_roi_intensity = np.min(intensities_list)
+        else:
+            current_min_roi_intensity = np.min(intensities_list)
+            if min_roi_intensity > current_min_roi_intensity:
+                min_roi_intensity = current_min_roi_intensity
+                min_roi_intensity_index = i
+
+    dead_cell = min_roi_intensity_index
+
+    print("Dead Cell: " + str(dead_cell), flush=True)
+
+    dead_cell_center = nuclei_centers[dead_cell]
+    for i, center in enumerate(nuclei_centers):
+        print(math.dist(center, dead_cell_center))
+        if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
+            close_cell_count += 1
+
+    print("Close Cell Count: " + str(close_cell_count), flush=True)
+
+    # get connections from astar algorithm
+    connection_list = astar.run_astar_algorithm(first_sampling_image_path,
+                                                nuc_dat, dead_cell,
+                                                close_cell_count)
+    # offset the pre and post image graphs so they line up
+    pre_offset = []
+    for i in range(0, len(pre_image_paths)):
+        pre_offset.append(i)
+
+    post_offset = []
+    for i in range(len(pre_image_paths) - 1, len(pre_image_paths) + len(post_image_paths) - 1):
+        post_offset.append(i)
+
+    # create the csv and pass fwhm and max to display_data
+    stats = anal.get_stats(nuc_dat, len(masks), pre_offset + post_offset, graph_data, dead_cell)
+
+    # create all of the graphs
+    display_data(graph_data)
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
