@@ -124,43 +124,43 @@ def generate_masks():
 #         image.show()
 
 
-def draw_on_image(event, x, y, flags, param):
-    ix = param[0]
-    iy = param[1]
-    drawing = param[2]
-    img = param[3]
+# def draw_on_image(event, x, y, flags, param):
+#     ix = param[0]
+#     iy = param[1]
+#     drawing = param[2]
+#     img = param[3]
 
-    if event == cv2.EVENT_LBUTTONDOWN:
-        drawing = True
-        ix = x
-        iy = y
-    elif event == cv2.EVENT_MOUSEMOVE:
-        if drawing == True:
-            cv2.rectangle(img, pt1=(ix, iy),
-                          pt2=(x, y),
-                          color=(0, 255, 255),
-                          thickness=-1)
-    elif event == cv2.EVENT_LBUTTONUP:
-        drawing = False
-        cv2.rectangle(img, pt1=(ix, iy),
-                      pt2=(x, y),
-                      color=(0, 255, 255),
-                      thickness=-1)
+#     if event == cv2.EVENT_LBUTTONDOWN:
+#         drawing = True
+#         ix = x
+#         iy = y
+#     elif event == cv2.EVENT_MOUSEMOVE:
+#         if drawing == True:
+#             cv2.rectangle(img, pt1=(ix, iy),
+#                           pt2=(x, y),
+#                           color=(0, 255, 255),
+#                           thickness=-1)
+#     elif event == cv2.EVENT_LBUTTONUP:
+#         drawing = False
+#         cv2.rectangle(img, pt1=(ix, iy),
+#                       pt2=(x, y),
+#                       color=(0, 255, 255),
+#                       thickness=-1)
 
 
-def show_and_edit_masks():
-    ix = -1
-    iy = -1
-    drawing = False
-    img = cv2.imread(os.path.join(config["experiment_name"], "sampling_image.png"))
-    param = [ix, iy, drawing, img]
-    cv2.namedWindow(winname="AstrocyteImage")
-    cv2.setMouseCallback("AstrocyteImage", draw_on_image, param)
-    while True:
-        cv2.imshow("AstrocyteImage", img)
+# def show_and_edit_masks():
+#     ix = -1
+#     iy = -1
+#     drawing = False
+#     img = cv2.imread(os.path.join(config["experiment_name"], "sampling_image.png"))
+#     param = [ix, iy, drawing, img]
+#     cv2.namedWindow(winname="AstrocyteImage")
+#     cv2.setMouseCallback("AstrocyteImage", draw_on_image, param)
+#     while True:
+#         cv2.imshow("AstrocyteImage", img)
 
-        if cv2.waitKey(10) == 27:
-            break
+#         if cv2.waitKey(10) == 27:
+#             break
 
 
 def save_masks(masks):
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     generate_masks()
 
     print("Here are the current masks, if there are any mistakes, please fix them")
-    show_and_edit_masks()
+    # show_and_edit_masks()
 
     graph_data = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
