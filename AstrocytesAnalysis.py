@@ -11,6 +11,10 @@ from multiprocessing import Pool, Manager
 import concurrent.futures
 import AstrocyteAStar as astar
 import FullAnalysis as anal
+from mpl_point_clicker import clicker
+from matplotlib.backend_bases import MouseButton
+from PIL import Image, ImageDraw
+import cv2
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
@@ -100,6 +104,63 @@ def generate_masks():
     post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
     plt.imshow(post_image)
     plt.savefig(os.path.join(config["experiment_name"], "masks_post.png"), format="png")
+    plt.clf()
+    # im = Image.fromarray(sampling_image)
+    # im.save("sampling_image.png")
+    # plt.savefig(os.path.join(config["experiment_name"], "sampling_image.png"), format="png")
+
+
+# def show_and_edit_masks():
+#     global masks
+#     image = Image.open(first_sampling_image_path)
+#     draw = ImageDraw.Draw(image)
+#     for o in nuc_outlines:
+#         for x, y in o[:,]:
+#             draw.point((x, y), fill="red")
+#     for c in cyto_outlines:
+#         for x, y in c[:,]:
+#             draw.point((x, y), fill="blue")
+#     while True:
+#         image.show()
+
+
+def draw_on_image(event, x, y, flags, param):
+    ix = param[0]
+    iy = param[1]
+    drawing = param[2]
+    img = param[3]
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        ix = x
+        iy = y
+    elif event == cv2.EVENT_MOUSEMOVE:
+        if drawing == True:
+            cv2.rectangle(img, pt1=(ix, iy),
+                          pt2=(x, y),
+                          color=(0, 255, 255),
+                          thickness=-1)
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        cv2.rectangle(img, pt1=(ix, iy),
+                      pt2=(x, y),
+                      color=(0, 255, 255),
+                      thickness=-1)
+
+
+def show_and_edit_masks():
+    ix = -1
+    iy = -1
+    drawing = False
+    img = cv2.imread(os.path.join(config["experiment_name"], "sampling_image.png"))
+    param = [ix, iy, drawing, img]
+    cv2.namedWindow(winname="AstrocyteImage")
+    cv2.setMouseCallback("AstrocyteImage", draw_on_image, param)
+    while True:
+        cv2.imshow("AstrocyteImage", img)
+
+        if cv2.waitKey(10) == 27:
+            break
 
 
 def save_masks(masks):
@@ -261,6 +322,9 @@ if __name__ == '__main__':
 
     print("Generating Masks", flush=True)
     generate_masks()
+
+    print("Here are the current masks, if there are any mistakes, please fix them")
+    show_and_edit_masks()
 
     graph_data = np.zeros((len(masks), len(pre_image_paths) + len(post_image_paths)))
 
