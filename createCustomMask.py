@@ -21,8 +21,8 @@ def findCenterOfMask(mask):
 def createTif(image,shockIndex,otherMaskIndex,bigMask,pathing):
     tiff = np.copy(image)
     # Create numpy arrays for the first and second channels
-    first_channel = np.zeros_like(src[:,:,0])
-    third_channel = np.zeros_like(src[:,:,2])
+    first_channel = np.zeros_like(src[:,:])
+    third_channel = np.zeros_like(src[:,:])
     firstMask = bigMask == shockIndex
     thirdMask = bigMask == otherMaskIndex
     first_channel[firstMask] = 1

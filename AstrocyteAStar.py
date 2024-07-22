@@ -132,17 +132,17 @@ def a_star_search(grid, src, dest, si, di):
 
 # Getting a test image (not being used in the model yet)
 def run_astar_algorithm(file_path_name_to_tiff, nuc_dat, shockwaved_cell, close_cell_count):
-    image = cv2.imread(file_path_name_to_tiff)
+    image = plt.imread(file_path_name_to_tiff)
     img = np.copy(image)
-    img[(img - np.mean(img)) / np.std(img) < 1.21] = 0
-    img[:, :, 0] = 0
-    img[:, :, 2] = 0
+    img[(img - np.mean(img)) / np.std(img) < .01] = 0
+#    img[:, :, 0] = 0
+#    img[:, :, 2] = 0
 
     nuc_outlines = utils.outlines_list(nuc_dat)
     nuc_whole_mask = nuc_dat
     nuc_whole_mask = nuc_whole_mask > 0
 
-    img[nuc_whole_mask, 1] = image[nuc_whole_mask, 1]
+    img[nuc_whole_mask] = image[nuc_whole_mask]
     # plt.imshow(img)
     # plt.title("Removed Background")
     # plt.show()
@@ -154,11 +154,13 @@ def run_astar_algorithm(file_path_name_to_tiff, nuc_dat, shockwaved_cell, close_
     print("Removed Background")
     # plt.imshow(img)
     for outline in nuc_outlines:
-        centers.append((int(outline[:, 1].mean()) // 4, int(outline[:, 0].mean())//4))
-    # plt.plot(outline[:,0]//4, outline[:,1]//4, color='r')
+        xscalar = image.shape[0]/SIZE
+        yscalar = image.shape[1]/SIZE
+        centers.append((int(outline[:, 1].mean() // xscalar), int(outline[:, 0].mean() // yscalar)))
+        # plt.plot(outline[:,0]//xscalar, outline[:,1]//yscalar, color='r')
     # plt.show()
-    print("Got Centers")
-    grid = np.copy(img)[:, :, 1]
+    print(f"Got Centers")
+    grid = np.copy(img)[:, :]
     print("Created Grid")
     global connection_map
     connection_map = np.zeros((len(centers)))  # 0 = not connected, 1 = networked, 2 = connected
@@ -185,11 +187,11 @@ def run_astar_algorithm(file_path_name_to_tiff, nuc_dat, shockwaved_cell, close_
             connection_map[i] = int(1.25 > len(path)/full_distance and len(path)/full_distance > .75)
             # print(len(path))
         print(f"Finished Cell {i}")
-        img[:, :, 0] = np.copy(grid[:, :])
-        img[start[0], start[1], 2] = 255
-        img[goal[0], goal[1], 2] = 255
+        img[:, :] = np.copy(grid[:, :])
+        img[start[0], start[1]] = 255
+        img[goal[0], goal[1]] = 255
         # plt.imshow(img)
-        # plt.title(f"Cell {i} to Cell {shockwavedCell}")
+        # plt.title(f"Cell {i} to Cell {shockwaved_cell}")
         # plt.show()
     paths = np.array(paths, dtype=object)
     dist_arr = []
@@ -206,7 +208,7 @@ def run_astar_algorithm(file_path_name_to_tiff, nuc_dat, shockwaved_cell, close_
 
 # EXAMPLE:
 
-# image = cv2.imread('/Users/connor/Downloads/TrainingSet/32_0.tiff')
-# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('/Users/connor/Downloads/TrainingSet/models/AstroNuclei2'))
-# nucDat = nucModel.eval(image, channels=[2,0])[0]
-# runAStarAlgorithm('/Users/connor/Downloads/TrainingSet/32_0.tiff', nucDat, 6, 6)
+# image = cv2.imread('d:\\FOV\\fov_5\\pre\\img_channel000_position000_time000000038_z000.tif')
+# nucModel = models.CellposeModel(gpu=True, pretrained_model=str('d:\\FOV\\Training_Data\\models\\alztest2'))
+# nucDat = nucModel.eval(image, channels=[0,0])[0]
+# run_astar_algorithm('d:\\FOV\\fov_5\\pre\\img_channel000_position000_time000000038_z000.tif', nucDat, 6, 6)

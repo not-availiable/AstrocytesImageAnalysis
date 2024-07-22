@@ -182,7 +182,7 @@ def sample_data(filedata):
 
     temp = []
     # the bg_intensity is the mean of all pixels with a z_score less than 1.21
-    bg_intensity = np.mean(sampling_image[np.where((sampling_image - np.mean(sampling_image)) / np.std(sampling_image) < 1.21)])
+    bg_intensity = np.mean(sampling_image[np.where((sampling_image - np.mean(sampling_image)) / np.std(sampling_image) < 0.01)])
 
     for mask in masks:
         intensity = np.sum(sampling_image[mask]) / np.sum(mask)
@@ -223,15 +223,14 @@ def display_data(graph_data):
         # post graph
         plt.plot(post_offset, graph_data[i][split_point-1:], color="red")
         title_text = ""
-        match connection_list[i]:
-            case 0:
-                title_text = "Not Connected"
-            case 1:
-                title_text = "Networked"
-            case 2:
-                title_text = "Connected"
-            case 3:
-                title_text = "Dead Cell"
+        if connection_list[i] == 0:
+            title_text = "Not Connected"
+        elif connection_list[i] == 1:
+            title_text = "Networked"
+        elif connection_list[i] == 2:
+            title_text = "Connected"
+        elif connection_list[i] == 3:
+            title_text = "Dead Cell"
         plt.title(title_text)
         plt.ylim(min_intensity, max_intensity+.05)
         plt.xlabel("Frame #")
@@ -307,15 +306,15 @@ if __name__ == '__main__':
     cyto_model = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
     print("Detecting Nuclei", flush=True)
-    nuc_dat = nuc_model.eval(sampling_image, channels=[2, 0])[0]
+    nuc_dat = nuc_model.eval(sampling_image, channels=[0, 0])[0]
     print("Detecting Cytoplasm", flush=True)
-    cyto_dat = cyto_model.eval(sampling_image, channels=[2, 0])[0]
+    cyto_dat = cyto_model.eval(sampling_image, channels=[0, 0])[0]
 
     # plot image with outlines overlaid in red
     nuc_outlines = utils.outlines_list(nuc_dat)
     cyto_outlines = utils.outlines_list(cyto_dat)
 
-    nuc_whole_mask = nuc_dat
+    nuc_whole_mask = np.copy(nuc_dat)
     nuc_whole_mask = nuc_whole_mask > 0
 
     cyto_whole_mask = cyto_dat
@@ -370,18 +369,20 @@ if __name__ == '__main__':
 
     # find the dead cell and the close cells automatically
     # can now run the code overnight because there are no prompts
-    min_roi_intensity = 0
-    min_roi_intensity_index = 0
+    max_roi_intensity = 0
+    max_roi_intensity_index = 0
     for i, intensities_list in enumerate(graph_data):
         if i == 0:
-            min_roi_intensity = np.min(intensities_list)
+            max_roi_intensity = np.max(intensities_list)
         else:
-            current_min_roi_intensity = np.min(intensities_list)
-            if min_roi_intensity > current_min_roi_intensity:
-                min_roi_intensity = current_min_roi_intensity
-                min_roi_intensity_index = i
+            current_max_roi_intensity = np.max(intensities_list)
+            if max_roi_intensity < current_max_roi_intensity:
+                max_roi_intensity = current_max_roi_intensity
+                max_roi_intensity_index = i
+            print("max intensity: " + str(max_roi_intensity) + " " + str(current_max_roi_intensity))    
+        print("max intensity: " + str(max_roi_intensity))
 
-    dead_cell = min_roi_intensity_index
+    dead_cell = max_roi_intensity_index
 
     print("Dead Cell: " + str(dead_cell), flush=True)
 

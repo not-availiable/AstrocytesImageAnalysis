@@ -103,6 +103,7 @@ def peak(x, y, roi):
 # Code to write cell data to stats
 def cell(nuc_dat, roi, shock):
     nuc_whole_mask = np.copy(nuc_dat)
+    nuc_whole_mask -= 1
     stats['Cell_Size'][roi] = np.sum(nuc_whole_mask == roi)
     print(np.sum(nuc_whole_mask == roi))
     stats['Distance'][roi] = math.dist(centers[roi], centers[shock])

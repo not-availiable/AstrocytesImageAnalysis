@@ -1,1 +1,1 @@
-{"pre_directory_location": "", "post_directory_location": "", "nuclei_model_location": "", "cyto_model_location": "", "experiment_name": ""}
+{"pre_directory_location": "d:\\FOV\\fov_5\\pre", "post_directory_location": "d:\\FOV\\fov_5\\post", "nuclei_model_location": "d:\\FOV\\Training_Data\\models\\alztest2", "cyto_model_location": "d:\\FOV\\Training_Data\\models\\alztest5", "experiment_name": "alztest"}
