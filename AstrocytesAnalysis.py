@@ -368,45 +368,35 @@ if __name__ == '__main__':
 
     # find the dead cell and the close cells automatically
     # can now run the code overnight because there are no prompts
-    max_avg_roi_intensity = 0
-    max_avg_roi_intensity_index = 0
-    kernel_size = 5
+    max_roi_intensity = 0
+    dead_cell = 0
 
-    # average
+    kernel_size = 5
     kernel = np.ones((kernel_size, kernel_size), np.float32) / (kernel_size * kernel_size)
 
+    first_post_image_path = os.path.join(post_dir_path, post_image_paths[0])
+    current_image = plt.imread(first_post_image_path)
+
+    # average filter using cv2
+    averaged_image = cv2.filter2D(current_image, -1, kernel)
+
     for i, mask in enumerate(masks):
-        total_intensity = 0
-        time_points = 0
+        roi_intensity = np.mean(averaged_image[mask])
+        
+        if roi_intensity > max_roi_intensity:
+            max_roi_intensity = roi_intensity
+            dead_cell = i
+        print(f"Cell {i}: average intensity of 5x5 grid: {roi_intensity}")
 
-        # Iterate through all time points
-        for t, image_path in enumerate(pre_image_paths + post_image_paths):
-            current_image = plt.imread(os.path.join(pre_dir_path if t < len(pre_image_paths) else post_dir_path, image_path))
-
-            # average filter using cv2
-            averaged_image = cv2.filter2D(current_image, -1, kernel)
-
-            roi_intensity = np.mean(averaged_image[mask])
-            total_intensity += roi_intensity
-            time_points += 1
-
-        avg_intensity = total_intensity / time_points
-
-        if avg_intensity > max_avg_roi_intensity:
-            max_avg_roi_intensity = avg_intensity
-            max_avg_roi_intensity_index = i
-        print(f"Cell {i}: average intensity of 5x5 grid over all time: {avg_intensity}")
-
-    dead_cell = max_avg_roi_intensity_index
     print("Dead Cell:", dead_cell, flush=True)
+
     dead_cell_center = nuclei_centers[dead_cell]
+    close_cell_count = 0
     for i, center in enumerate(nuclei_centers):
-        print(math.dist(center, dead_cell_center))
         if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
             close_cell_count += 1
 
-    print("Close Cell Count: " + str(close_cell_count), flush=True)
-
+    print("Close Cell Count:", close_cell_count, flush=True)   
     # get connections from astar algorithm
     connection_list = astar.run_astar_algorithm(first_sampling_image_path,
                                                 nuc_dat, dead_cell,
