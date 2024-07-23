@@ -368,38 +368,37 @@ if __name__ == '__main__':
 
     # find the dead cell and the close cells automatically
     # can now run the code overnight because there are no prompts
-    max_roi_intensity = 0
-    max_roi_intensity_index = 0
-    
+    max_avg_roi_intensity = 0
+    max_avg_roi_intensity_index = 0
     kernel_size = 5
+
     # average
     kernel = np.ones((kernel_size, kernel_size), np.float32) / (kernel_size * kernel_size)
 
     for i, mask in enumerate(masks):
-        max_avg_intensity = 0
-        
-        # check all time instead of just one point
+        total_intensity = 0
+        time_points = 0
+
+        # Iterate through all time points
         for t, image_path in enumerate(pre_image_paths + post_image_paths):
-       
             current_image = plt.imread(os.path.join(pre_dir_path if t < len(pre_image_paths) else post_dir_path, image_path))
-            
+
             # average filter using cv2
             averaged_image = cv2.filter2D(current_image, -1, kernel)
-            
-            roi_intensity = np.mean(averaged_image[mask])
-            
-            if roi_intensity > max_avg_intensity:
-                max_avg_intensity = roi_intensity
-        
-        if max_avg_intensity > max_roi_intensity:
-            max_roi_intensity = max_avg_intensity
-            max_roi_intensity_index = i
-        print(f"Cell {i}: max average intensity of 5x5 grid over time: {max_avg_intensity}")
 
-    dead_cell = max_roi_intensity_index
-    
+            roi_intensity = np.mean(averaged_image[mask])
+            total_intensity += roi_intensity
+            time_points += 1
+
+        avg_intensity = total_intensity / time_points
+
+        if avg_intensity > max_avg_roi_intensity:
+            max_avg_roi_intensity = avg_intensity
+            max_avg_roi_intensity_index = i
+        print(f"Cell {i}: average intensity of 5x5 grid over all time: {avg_intensity}")
+
+    dead_cell = max_avg_roi_intensity_index
     print("Dead Cell:", dead_cell, flush=True)
-    
     dead_cell_center = nuclei_centers[dead_cell]
     for i, center in enumerate(nuclei_centers):
         print(math.dist(center, dead_cell_center))
