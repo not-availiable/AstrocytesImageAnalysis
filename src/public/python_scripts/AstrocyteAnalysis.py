@@ -17,6 +17,9 @@ from PIL import Image, ImageDraw
 import cv2
 import sys
 import traceback
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="cellpose.resnet_torch")
+
 
 # start timer to measure how long code takes to execute
 start_time = time.time()
@@ -201,7 +204,6 @@ def sample_data(filedata):
         if value > max_intensity:
             max_intensity = value
 
-    print("Finished processing frame: " + str(insert_index), flush=True)
     first_image_sample = False
     return temp, insert_index, min_intensity, max_intensity, first_image_sample, first_image_normalized_intensities
 
@@ -239,7 +241,8 @@ def display_data(graph_data):
         plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
         plt.axvline(stats['FWHM_Right_Index'][i], linestyle="dashed")
         plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
-        plt.savefig(os.path.join(config["experiment_name"], "plot" + str(i) + ".png"), format="png")
+        plt.savefig(os.path.join(config["experiment_name"], f"plot{i}.png"))
+        plt.close()
 
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -253,15 +256,19 @@ def create_circular_mask(h, w, center=None, radius=None):
 
     mask = dist_from_center <= radius
     return mask
-
+def print_output(message):
+    print(message, flush=True)
+    sys.stdout.flush()
 
 if __name__ == '__main__':
     try:
         multiprocessing.freeze_support()
+        if len(sys.argv) < 2:
+            print("Error: Config file path not provided")
+            sys.exit(1)
 
-        # Load the configuration file
-        config = []
-        with open("config.json") as f:
+        config_path = sys.argv[1]
+        with open(config_path, 'r') as f:
             config = json.load(f)
 
         pre_dir_path = config["pre_directory_location"]
@@ -307,9 +314,9 @@ if __name__ == '__main__':
         nuc_model = models.CellposeModel(gpu=True, pretrained_model=str(config["nuclei_model_location"]))
         cyto_model = models.CellposeModel(gpu=True, pretrained_model=str(config["cyto_model_location"]))
 
-        print("Detecting Nuclei", flush=True)
+        print_output("Detecting Nuclei...")
         nuc_dat = nuc_model.eval(sampling_image, channels=[0, 0])[0]
-        print("Detecting Cytoplasm", flush=True)
+        print_output("Detecting Cytoplasm...")
         cyto_dat = cyto_model.eval(sampling_image, channels=[0, 0])[0]
 
         # plot image with outlines overlaid in red
@@ -321,7 +328,7 @@ if __name__ == '__main__':
 
         cyto_whole_mask = cyto_dat
 
-        print("Generating Masks", flush=True)
+        print_output("Generating Masks...")
         generate_masks()
 
 
@@ -352,7 +359,7 @@ if __name__ == '__main__':
             i += 1
 
         full_image_data.pop(0)
-
+        print_output("Iterating...")
         # sample all of the data using multiprocessing
         p = Pool(16)
         for result in p.map(sample_data, full_image_data):
@@ -413,7 +420,8 @@ if __name__ == '__main__':
             post_offset.append(i)
 
         # create the csv and pass fwhm and max to display_data
-        stats = anal.get_stats(nuc_dat, len(masks), pre_offset + post_offset, graph_data, dead_cell)
+        stats = anal.get_stats(nuc_dat, len(masks), pre_offset + post_offset, graph_data, dead_cell, config_path)
+
 
         # create all of the graphs
         display_data(graph_data)

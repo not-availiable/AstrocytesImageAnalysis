@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, Grid, Modal, TextField, Fab } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { styled, keyframes } from '@mui/system';
+import { Box, Button, Typography, Paper, Grid, Modal, TextField, Fab, CircularProgress } from '@mui/material';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -90,34 +90,53 @@ function AnalysisPanel() {
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({
-    preDirectory: '',
-    postDirectory: '',
-    nucleiModel: '',
-    cytoModel: ''
+  const [config, setConfig] = useState({
+    pre_directory_location: '',
+    post_directory_location: '',
+    nuclei_model_location: '',
+    cyto_model_location: '',
+    experiment_name: ''
   });
+  const [scriptOutput, setScriptOutput] = useState('');
+  const [graphPaths, setGraphPaths] = useState([]);
+  const [currentGraphIndex, setCurrentGraphIndex] = useState(0);
 
   useEffect(() => {
-    loadSettings();
+    loadConfig();
   }, []);
 
-  const loadSettings = async () => {
-    const loadedSettings = await ipcRenderer.invoke('load-settings');
-    if (loadedSettings) {
-      setSettings(loadedSettings);
+  useEffect(() => {
+    const handlePythonOutput = (event, data) => {
+      setScriptOutput(prev => prev + data);
+    };
+    ipcRenderer.on('python-output', handlePythonOutput);
+    return () => {
+      ipcRenderer.removeListener('python-output', handlePythonOutput);
+    };
+  }, []);
+
+  const loadConfig = async () => {
+    const loadedConfig = await ipcRenderer.invoke('load-config');
+    if (loadedConfig) {
+      setConfig(loadedConfig);
     }
   };
 
-  const saveSettings = async () => {
-    await ipcRenderer.invoke('save-settings', settings);
+  const saveConfig = async () => {
+    await ipcRenderer.invoke('save-config', config);
     handleCloseSettings();
   };
 
   const runAnalysis = async () => {
     setIsLoading(true);
+    setScriptOutput('');
+    setGraphPaths([]);
     try {
-      const pythonResult = await ipcRenderer.invoke('run-python-script', 'sample_analysis.py', ['arg1', 'arg2']);
+      await ipcRenderer.invoke('save-config', config);
+      const pythonResult = await ipcRenderer.invoke('run-python-script', 'AstrocyteAnalysis.py');
       setResult(pythonResult);
+      const graphs = await ipcRenderer.invoke('get-graph-paths');
+      setGraphPaths(graphs);
     } catch (error) {
       console.error('Error running Python script:', error);
       setResult('Error: ' + error.message);
@@ -132,7 +151,14 @@ function AnalysisPanel() {
   const browseFolder = async (key) => {
     const result = await ipcRenderer.invoke('open-folder-dialog');
     if (result) {
-      setSettings({ ...settings, [key]: result });
+      setConfig({ ...config, [key]: result });
+    }
+  };
+
+  const browseFile = async (key) => {
+    const result = await ipcRenderer.invoke('open-file-dialog');
+    if (result) {
+      setConfig({ ...config, [key]: result });
     }
   };
 
@@ -146,35 +172,18 @@ function AnalysisPanel() {
               <GlowElement sx={{ display: 'inline-block', m: 0.5 }}>
                 <StyledButton 
                   variant="contained" 
-                  startIcon={<PlayArrowIcon />} 
+                  startIcon={isLoading ? <CircularProgress size={24} /> : <PlayArrowIcon />}
                   onClick={runAnalysis}
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Running...' : 'Start'}
+                  {isLoading ? 'Running...' : 'Start Analysis'}
                 </StyledButton>
               </GlowElement>
-              <GlowElement sx={{ display: 'inline-block', m: 0.5 }}>
-                <StyledButton 
-                  variant="contained" 
-                  startIcon={<StopIcon />} 
-                  color="secondary"
-                  disabled={!isLoading}
-                >
-                  Stop
-                </StyledButton>
-              </GlowElement>
-            </StyledPaper>
-          </GlowElement>
-        </Grid>
-        <Grid item xs={12}>
-          <GlowElement>
-            <StyledPaper>
-              <Typography variant="h5" gutterBottom>Analysis Options</Typography>
-              {['Option 1', 'Option 2', 'Option 3', 'Option 4'].map((option, index) => (
-                <GlowElement key={index} sx={{ display: 'inline-block', m: 0.5 }}>
-                  <StyledButton variant="outlined">{option}</StyledButton>
-                </GlowElement>
-              ))}
+              {isLoading && (
+                <Box sx={{ mt: 2, maxHeight: '200px', overflowY: 'auto', backgroundColor: 'rgba(0,0,0,0.1)', padding: 2, borderRadius: 1 }}>
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{scriptOutput}</pre>
+                </Box>
+              )}
             </StyledPaper>
           </GlowElement>
         </Grid>
@@ -185,6 +194,39 @@ function AnalysisPanel() {
                 <Typography variant="h5" gutterBottom>Results</Typography>
                 <Box sx={{ maxHeight: '300px', overflowY: 'auto' }}>
                   <pre>{JSON.stringify(result, null, 2)}</pre>
+                </Box>
+              </StyledPaper>
+            </GlowElement>
+          </Grid>
+        )}
+        {graphPaths.length > 0 && (
+          <Grid item xs={12}>
+            <GlowElement>
+              <StyledPaper>
+                <Typography variant="h5" gutterBottom>Graphs</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <img 
+                    src={graphPaths[currentGraphIndex]} 
+                    alt={`Graph ${currentGraphIndex}`} 
+                    style={{maxWidth: '100%', maxHeight: '400px', objectFit: 'contain'}} 
+                  />
+                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
+                    <Button 
+                      onClick={() => setCurrentGraphIndex(prev => (prev > 0 ? prev - 1 : graphPaths.length - 1))}
+                      disabled={graphPaths.length <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <Typography>
+                      Graph {currentGraphIndex + 1} of {graphPaths.length}
+                    </Typography>
+                    <Button 
+                      onClick={() => setCurrentGraphIndex(prev => (prev < graphPaths.length - 1 ? prev + 1 : 0))}
+                      disabled={graphPaths.length <= 1}
+                    >
+                      Next
+                    </Button>
+                  </Box>
                 </Box>
               </StyledPaper>
             </GlowElement>
@@ -202,21 +244,24 @@ function AnalysisPanel() {
         <SettingsContent>
           <Typography variant="h5" gutterBottom>Settings</Typography>
           <Grid container spacing={2}>
-            {Object.entries(settings).map(([key, value]) => (
+            {Object.entries(config).map(([key, value]) => (
               <Grid item xs={12} key={key}>
                 <GlowElement>
                   <TextField
                     fullWidth
-                    label={key}
+                    label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     value={value}
-                    onChange={(e) => setSettings({ ...settings, [key]: e.target.value })}
+                    onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
                     InputProps={{
                       endAdornment: (
-                        <Button onClick={() => browseFolder(key)}>
+                        <Button onClick={() => key.includes('location') ? 
+                          (key.includes('model') ? browseFile(key) : browseFolder(key)) : 
+                          null}>
                           <FolderOpenIcon />
                         </Button>
                       ),
                     }}
+                    sx={{ '& .MuiInputLabel-root': { whiteSpace: 'normal' } }}
                   />
                 </GlowElement>
               </Grid>
@@ -224,7 +269,7 @@ function AnalysisPanel() {
           </Grid>
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
             <Button onClick={handleCloseSettings}>Cancel</Button>
-            <Button onClick={saveSettings} variant="contained" sx={{ ml: 1 }}>Save</Button>
+            <Button onClick={saveConfig} variant="contained" sx={{ ml: 1 }}>Save</Button>
           </Box>
         </SettingsContent>
       </SettingsModal>
