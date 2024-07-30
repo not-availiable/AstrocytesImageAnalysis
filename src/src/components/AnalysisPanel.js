@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StopIcon from '@mui/icons-material/Stop';
+//import StopIcon from '@mui/icons-material/Stop';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { styled, keyframes } from '@mui/system';
@@ -85,9 +85,7 @@ const FloatingSettingsButton = styled(Fab)(({ theme }) => ({
     background: 'rgba(255, 255, 255, 0.2)',
   },
 }));
-
 function AnalysisPanel() {
-  const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [config, setConfig] = useState({
@@ -98,14 +96,11 @@ function AnalysisPanel() {
     experiment_name: ''
   });
   const [scriptOutput, setScriptOutput] = useState('');
-  const [graphPaths, setGraphPaths] = useState([]);
+  const [graphDataUrls, setGraphDataUrls] = useState([]);
   const [currentGraphIndex, setCurrentGraphIndex] = useState(0);
 
   useEffect(() => {
     loadConfig();
-  }, []);
-
-  useEffect(() => {
     const handlePythonOutput = (event, data) => {
       setScriptOutput(prev => prev + data);
     };
@@ -130,16 +125,16 @@ function AnalysisPanel() {
   const runAnalysis = async () => {
     setIsLoading(true);
     setScriptOutput('');
-    setGraphPaths([]);
+    setGraphDataUrls([]);
     try {
       await ipcRenderer.invoke('save-config', config);
-      const pythonResult = await ipcRenderer.invoke('run-python-script', 'AstrocyteAnalysis.py');
-      setResult(pythonResult);
+      await ipcRenderer.invoke('run-python-script', 'AstrocyteAnalysis.py');
       const graphs = await ipcRenderer.invoke('get-graph-paths');
-      setGraphPaths(graphs);
+      console.log('Received graph data URLs:', graphs);
+      setGraphDataUrls(graphs);
     } catch (error) {
       console.error('Error running Python script:', error);
-      setResult('Error: ' + error.message);
+      setScriptOutput(prev => prev + '\nError: ' + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -187,42 +182,28 @@ function AnalysisPanel() {
             </StyledPaper>
           </GlowElement>
         </Grid>
-        {result && (
-          <Grid item xs={12}>
-            <GlowElement>
-              <StyledPaper>
-                <Typography variant="h5" gutterBottom>Results</Typography>
-                <Box sx={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <pre>{JSON.stringify(result, null, 2)}</pre>
-                </Box>
-              </StyledPaper>
-            </GlowElement>
-          </Grid>
-        )}
-        {graphPaths.length > 0 && (
+        {graphDataUrls.length > 0 && (
           <Grid item xs={12}>
             <GlowElement>
               <StyledPaper>
                 <Typography variant="h5" gutterBottom>Graphs</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <img 
-                    src={graphPaths[currentGraphIndex]} 
-                    alt={`Graph ${currentGraphIndex}`} 
+                    src={graphDataUrls[currentGraphIndex]} 
+                    alt={`Graph ${currentGraphIndex + 1}`} 
                     style={{maxWidth: '100%', maxHeight: '400px', objectFit: 'contain'}} 
                   />
                   <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
                     <Button 
-                      onClick={() => setCurrentGraphIndex(prev => (prev > 0 ? prev - 1 : graphPaths.length - 1))}
-                      disabled={graphPaths.length <= 1}
+                      onClick={() => setCurrentGraphIndex(prev => (prev > 0 ? prev - 1 : graphDataUrls.length - 1))}
                     >
                       Previous
                     </Button>
                     <Typography>
-                      Graph {currentGraphIndex + 1} of {graphPaths.length}
+                      Graph {currentGraphIndex + 1} of {graphDataUrls.length}
                     </Typography>
                     <Button 
-                      onClick={() => setCurrentGraphIndex(prev => (prev < graphPaths.length - 1 ? prev + 1 : 0))}
-                      disabled={graphPaths.length <= 1}
+                      onClick={() => setCurrentGraphIndex(prev => (prev < graphDataUrls.length - 1 ? prev + 1 : 0))}
                     >
                       Next
                     </Button>
@@ -261,7 +242,19 @@ function AnalysisPanel() {
                         </Button>
                       ),
                     }}
-                    sx={{ '& .MuiInputLabel-root': { whiteSpace: 'normal' } }}
+                    sx={{ 
+                      '& .MuiInputLabel-root': { 
+                        whiteSpace: 'normal',
+                        transform: 'translate(14px, 14px) scale(0.75)',
+                        transformOrigin: 'top left'
+                      },
+                      '& .MuiInputLabel-shrink': {
+                        transform: 'translate(14px, 8px) scale(0.75)',
+                      },
+                      '& .MuiInputBase-root': {
+                        marginTop: '16px'
+                      }
+                    }}
                   />
                 </GlowElement>
               </Grid>

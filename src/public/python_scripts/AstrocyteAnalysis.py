@@ -395,9 +395,9 @@ if __name__ == '__main__':
             if roi_intensity > max_roi_intensity:
                 max_roi_intensity = roi_intensity
                 dead_cell = i
-            print(f"Cell {i}: average intensity of 5x5 grid: {roi_intensity}")
+            #print(f"Cell {i}: average intensity of 5x5 grid: {roi_intensity}")
 
-        print("Dead Cell:", dead_cell, flush=True)
+       # print("Dead Cell:", dead_cell, flush=True)
 
         dead_cell_center = nuclei_centers[dead_cell]
         close_cell_count = 0
@@ -405,7 +405,7 @@ if __name__ == '__main__':
             if math.dist(center, dead_cell_center) < 225 and i != dead_cell:
                 close_cell_count += 1
 
-        print("Close Cell Count:", close_cell_count, flush=True)   
+        #print("Close Cell Count:", close_cell_count, flush=True)   
         # get connections from astar algorithm
         connection_list = astar.run_astar_algorithm(first_sampling_image_path,
                                                     nuc_dat, dead_cell,
@@ -442,7 +442,7 @@ if __name__ == '__main__':
             "min_intensity": float(min_intensity),
             "max_intensity": float(max_intensity)
         }
-        print(json.dumps(results))
+        #print(json.dumps(results))
 
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
