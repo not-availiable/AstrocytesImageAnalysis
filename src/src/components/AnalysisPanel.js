@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-//import StopIcon from '@mui/icons-material/Stop';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { styled, keyframes } from '@mui/system';
@@ -85,6 +84,7 @@ const FloatingSettingsButton = styled(Fab)(({ theme }) => ({
     background: 'rgba(255, 255, 255, 0.2)',
   },
 }));
+
 function AnalysisPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -96,7 +96,7 @@ function AnalysisPanel() {
     experiment_name: ''
   });
   const [scriptOutput, setScriptOutput] = useState('');
-  const [graphDataUrls, setGraphDataUrls] = useState([]);
+  const [graphData, setGraphData] = useState([]);
   const [currentGraphIndex, setCurrentGraphIndex] = useState(0);
 
   useEffect(() => {
@@ -125,13 +125,13 @@ function AnalysisPanel() {
   const runAnalysis = async () => {
     setIsLoading(true);
     setScriptOutput('');
-    setGraphDataUrls([]);
+    setGraphData([]);
     try {
       await ipcRenderer.invoke('save-config', config);
       await ipcRenderer.invoke('run-python-script', 'AstrocyteAnalysis.py');
       const graphs = await ipcRenderer.invoke('get-graph-paths');
-      console.log('Received graph data URLs:', graphs);
-      setGraphDataUrls(graphs);
+      console.log('Received graph data:', graphs);
+      setGraphData(graphs);
     } catch (error) {
       console.error('Error running Python script:', error);
       setScriptOutput(prev => prev + '\nError: ' + error.message);
@@ -182,28 +182,32 @@ function AnalysisPanel() {
             </StyledPaper>
           </GlowElement>
         </Grid>
-        {graphDataUrls.length > 0 && (
+        {graphData.length > 0 && (
           <Grid item xs={12}>
             <GlowElement>
               <StyledPaper>
                 <Typography variant="h5" gutterBottom>Graphs</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <img 
-                    src={graphDataUrls[currentGraphIndex]} 
-                    alt={`Graph ${currentGraphIndex + 1}`} 
-                    style={{maxWidth: '100%', maxHeight: '400px', objectFit: 'contain'}} 
+                    src={graphData[currentGraphIndex].data}
+                    alt={`Graph ${graphData[currentGraphIndex].name}`}
+                    style={{maxWidth: '100%', maxHeight: '400px', objectFit: 'contain'}}
+                    onError={(e) => {
+                      console.error('Error loading image:', e);
+                      e.target.src = 'path/to/fallback/image.png'; // Provide a fallback image
+                    }}
                   />
                   <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
                     <Button 
-                      onClick={() => setCurrentGraphIndex(prev => (prev > 0 ? prev - 1 : graphDataUrls.length - 1))}
+                      onClick={() => setCurrentGraphIndex(prev => (prev > 0 ? prev - 1 : graphData.length - 1))}
                     >
                       Previous
                     </Button>
                     <Typography>
-                      Graph {currentGraphIndex + 1} of {graphDataUrls.length}
+                      Graph {currentGraphIndex + 1} of {graphData.length}
                     </Typography>
                     <Button 
-                      onClick={() => setCurrentGraphIndex(prev => (prev < graphDataUrls.length - 1 ? prev + 1 : 0))}
+                      onClick={() => setCurrentGraphIndex(prev => (prev < graphData.length - 1 ? prev + 1 : 0))}
                     >
                       Next
                     </Button>

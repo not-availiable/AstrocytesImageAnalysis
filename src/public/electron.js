@@ -1,10 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol} = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 const { PythonShell } = require('python-shell');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
-
 
 let mainWindow;
 
@@ -61,16 +60,14 @@ async function saveConfig(config) {
   await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 }
 
-function getSettingsPath() {
-  return path.join(app.getPath('userData'), 'settings.json');
-}
-
 app.whenReady().then(() => {
-  createWindow();
   protocol.registerFileProtocol('file', (request, callback) => {
-    const pathname = decodeURI(request.url.replace('file:///', ''));
-    callback(pathname);
+    const url = request.url.substr(8);
+    callback({ path: decodeURI(url) });
   });
+
+  createWindow();
+
   ipcMain.handle('run-python-script', async (event, scriptName) => {
     return new Promise(async (resolve, reject) => {
       const pythonScriptPath = path.join(__dirname, '..', 'public', 'python_scripts', scriptName);
@@ -107,21 +104,24 @@ app.whenReady().then(() => {
   ipcMain.handle('get-graph-paths', async () => {
     const configPath = await getConfigPath();
     const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
-    const graphDir = path.join(config.experiment_name);
+    const graphDir = path.resolve(app.getPath('userData'), config.experiment_name);
     console.log('Looking for graphs in:', graphDir);
     const files = await fs.readdir(graphDir);
-    const graphPaths = files.filter(file => file.endsWith('.png')).map(file => path.join(graphDir, file));
-    console.log('Found graph paths:', graphPaths);
+    const graphFiles = files.filter(file => file.endsWith('.png'));
     
-    // Convert images to data URLs
-    const graphDataUrls = await Promise.all(graphPaths.map(async (graphPath) => {
-      const imageBuffer = await fs.readFile(graphPath);
-      const image = nativeImage.createFromBuffer(imageBuffer);
-      return image.toDataURL();
+    const graphData = await Promise.all(graphFiles.map(async (file) => {
+      const filePath = path.join(graphDir, file);
+      const data = await fs.readFile(filePath);
+      return {
+        name: file,
+        data: `data:image/png;base64,${data.toString('base64')}`
+      };
     }));
-    
-    return graphDataUrls;
+
+    console.log(`Loaded ${graphData.length} graph images`);
+    return graphData;
   });
+
   ipcMain.handle('load-config', loadConfig);
 
   ipcMain.handle('save-config', async (event, config) => {
@@ -141,26 +141,6 @@ app.whenReady().then(() => {
       properties: ['openFile']
     });
     return result.canceled ? null : result.filePaths[0];
-  });
-
-  ipcMain.handle('save-settings', async (event, settings) => {
-    try {
-      await fs.writeFile(getSettingsPath(), JSON.stringify(settings, null, 2));
-      return true;
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      return false;
-    }
-  });
-
-  ipcMain.handle('load-settings', async () => {
-    try {
-      const data = await fs.readFile(getSettingsPath(), 'utf8');
-      return JSON.parse(data);
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-      return null;
-    }
   });
 });
 

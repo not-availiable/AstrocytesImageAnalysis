@@ -104,10 +104,10 @@ def generate_masks():
         i += 1
 
     plt.imshow(sampling_image)
-    plt.savefig(os.path.join(config["experiment_name"], "masks_pre.png"), format="png")
-    post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[len(post_image_paths)-1]))
+    plt.savefig(os.path.join(os.path.dirname(config_path), config["experiment_name"], "masks_pre.png"), format="png")
+    post_image = plt.imread(os.path.join(post_dir_path, post_image_paths[-1]))
     plt.imshow(post_image)
-    plt.savefig(os.path.join(config["experiment_name"], "masks_post.png"), format="png")
+    plt.savefig(os.path.join(os.path.dirname(config_path), config["experiment_name"], "masks_post.png"), format="png")
     plt.clf()
     # im = Image.fromarray(sampling_image)
     # im.save("sampling_image.png")
@@ -241,9 +241,8 @@ def display_data(graph_data):
         plt.axvline(stats['FWHM_Left_Index'][i], linestyle="dashed")
         plt.axvline(stats['FWHM_Right_Index'][i], linestyle="dashed")
         plt.axhline(stats['Peak_Value'][i], linestyle="dashed")
-        plt.savefig(os.path.join(config["experiment_name"], f"plot{i}.png"))
+        plt.savefig(os.path.join(os.path.dirname(config_path), config["experiment_name"], f"plot{i}.png"))
         plt.close()
-
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None:  # use the middle of the image
@@ -300,7 +299,8 @@ if __name__ == '__main__':
         first_image_sample = True
         first_image_normalized_intensities = []
 
-        os.makedirs(os.path.join(os.getcwd(), config["experiment_name"]), exist_ok=True)
+        os.makedirs(os.path.join(os.path.dirname(config_path), config["experiment_name"]), exist_ok=True)
+
 
         min_intensity = 1
         max_intensity = 1
