@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 const { PythonShell } = require('python-shell');
+const fs = require('fs').promises;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -49,4 +50,35 @@ ipcMain.handle('run-python-script', async (event, scriptName, args) => {
       }
     );
   });
+});
+
+ipcMain.handle('open-folder-dialog', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+function getSettingsPath() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+ipcMain.handle('save-settings', async (event, settings) => {
+  try {
+    await fs.writeFile(getSettingsPath(), JSON.stringify(settings, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('load-settings', async () => {
+  try {
+    const data = await fs.readFile(getSettingsPath(), 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+    return null;
+  }
 });

@@ -1,6 +1,5 @@
 import React from 'react';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import Header from './components/Header';
 import AnalysisPanel from './components/AnalysisPanel';
 
 const darkTheme = createTheme({
@@ -52,7 +51,6 @@ function App() {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <div className="App" style={{ backgroundColor: '#121212', minHeight: '100vh' }}>
-        <Header />
         <AnalysisPanel />
       </div>
     </ThemeProvider>
